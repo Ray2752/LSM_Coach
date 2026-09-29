@@ -114,6 +114,17 @@ def landmarks_to_features(landmarks):
     return [round(v, 5) for v in feats]
 
 
+def one_sided(rng):
+    """Un dedo que debe ir CERRADO no puede estar "demasiado cerrado", y uno EXTENDIDO no
+    puede estar "demasiado extendido": el error real es solo hacia el otro lado. Por eso
+    se quita ese límite. Los dedos curvados (C) conservan ambos límites."""
+    if rng["promedio"] < 90:
+        rng["min"] = 0.0
+    elif rng["promedio"] > 140:
+        rng["max"] = 180.0
+    return rng
+
+
 def rotate_upright(X):
     """Gira cada mano en el plano de la imagen para que muñeca -> base del dedo medio
     apunte hacia arriba. X: filas de 63 números de landmarks_to_features.
@@ -294,10 +305,13 @@ def cmd_analyze(args):
 
     per_finger = {f: [] for f in FINGER_JOINTS.keys()}
     per_axis = {a: [] for a in ORIENT_AXES}
+    people = set(args.personas or [])
     with open(csv_path, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         n = 0
         for row in reader:
+            if people and row.get("person") not in people:
+                continue
             n += 1
             for finger in FINGER_JOINTS.keys():
                 per_finger[finger].append(float(row[finger]))
@@ -306,6 +320,8 @@ def cmd_analyze(args):
                 if v not in (None, ""):
                     per_axis[axis].append(float(v))
 
+    if n == 0:
+        sys.exit(f"No hay muestras de {', '.join(sorted(people))} para '{args.sign}'.")
     if n < 5:
         print(f"Aviso: solo hay {n} muestras. Idealmente graben al menos 15-30 "
               "(varias personas repitiendo la seña) antes de fijar el rango.")
@@ -314,31 +330,43 @@ def cmd_analyze(args):
     if os.path.exists(OUTPUT_FILE):
         with open(OUTPUT_FILE, encoding="utf-8") as f:
             all_tolerances = json.load(f)
-    widths = all_tolerances.get(args.sign, {}).get("ancho")
-    centered = widths is not None and not args.solo_propias
+    previous = all_tolerances.get(args.sign, {})
+    widths = previous.get("ancho")
+    keep_population = widths is not None and not args.centrar and not args.solo_propias
+    centered = widths is not None and args.centrar
 
     result = {}
-    if centered:
+    if keep_population:
+        # Los rangos de los dedos del dataset público (20 personas) aceptan mejor a gente
+        # nueva que unos centrados en pocas personas: se conservan y solo se calibra la
+        # orientación con estas muestras.
+        result = {k: v for k, v in previous.items() if k != "orientacion"}
+        method = "dedos: se conservan los del dataset público (usa --centrar para cambiarlos)"
+        print(f"\n'{args.sign}' ({n} muestras). {method}")
+    elif centered:
         # Centro = la mediana de SUS muestras (su mano, su cámara); ancho = el que midió
         # evaluate_public.py con 20 personas del dataset público.
         result["ancho"] = widths
         method = "centrado en sus muestras, con el ancho del dataset público"
     else:
         method = f"promedio ± {args.margin} desviaciones de sus muestras"
-    result["fuente"] = f"{n} muestras propias; {method}"
-    print(f"\nResultados para '{args.sign}' ({n} muestras, {method}):\n")
-    for finger, values in per_finger.items():
-        if centered:
-            med = statistics.median(values)
-            down, up = widths[finger]
-            result[finger] = {"min": round(max(med - down, 0.0), 1),
-                              "max": round(min(med + up, 180.0), 1),
-                              "promedio": round(statistics.mean(values), 1)}
-        else:  # un ángulo real está en [0°, 180°]
-            result[finger] = _range(values, args.margin, args.holgura_min, 0.0, 180.0)
-        r = result[finger]
-        print(f"  {finger:10s}  promedio={r['promedio']:6.1f}°  "
-              f"rango sugerido=[{r['min']:.1f}°, {r['max']:.1f}°]")
+    who = f" de {', '.join(sorted(people))}" if people else ""
+    if not keep_population:
+        result["fuente"] = f"{n} muestras propias{who}; {method}"
+        print(f"\nResultados para '{args.sign}' ({n} muestras, {method}):\n")
+        for finger, values in per_finger.items():
+            if centered:
+                med = statistics.median(values)
+                down, up = widths[finger]
+                result[finger] = one_sided({"min": round(max(med - down, 0.0), 1),
+                                            "max": round(min(med + up, 180.0), 1),
+                                            "promedio": round(statistics.mean(values), 1)})
+            else:  # un ángulo real está en [0°, 180°]
+                result[finger] = one_sided(
+                    _range(values, args.margin, args.holgura_min, 0.0, 180.0))
+            r = result[finger]
+            print(f"  {finger:10s}  promedio={r['promedio']:6.1f}°  "
+                  f"rango sugerido=[{r['min']:.1f}°, {r['max']:.1f}°]")
 
     if all(len(v) >= MIN_IMU_SAMPLES for v in per_axis.values()):
         result["orientacion"] = {axis: _range(vals, args.margin, args.holgura_orient)
@@ -381,6 +409,11 @@ def main():
                             help="holgura mínima en grados para los dedos (default 6)")
     p_analyze.add_argument("--holgura-orient", type=float, default=10.0,
                             help="holgura mínima en grados para roll/pitch (default 10)")
+    p_analyze.add_argument("--personas", nargs="+",
+                            help="usa solo las muestras de estas personas (p. ej. la persona experta)")
+    p_analyze.add_argument("--centrar", action="store_true",
+                            help="centra los rangos de los dedos en estas muestras (con el ancho del "
+                                 "dataset público); por defecto se conservan los de la población")
     p_analyze.add_argument("--solo-propias", action="store_true",
                             help="ignora el ancho del dataset público y usa promedio ± margen")
     p_analyze.set_defaults(func=cmd_analyze)

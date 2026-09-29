@@ -1,332 +1,1051 @@
 {
   "A": {
     "pulgar": {
-      "min": 153.8,
-      "max": 178.9,
+      "min": 147.2,
+      "max": 180.0,
       "promedio": 170.5
     },
     "indice": {
-      "min": 44.5,
-      "max": 122.4,
+      "min": 0.0,
+      "max": 136.3,
       "promedio": 59.7
     },
     "medio": {
-      "min": 32.8,
-      "max": 120.9,
+      "min": 0.0,
+      "max": 132.3,
       "promedio": 49.7
     },
     "anular": {
-      "min": 15.7,
-      "max": 100.1,
+      "min": 0.0,
+      "max": 104.4,
       "promedio": 33.8
     },
     "menique": {
-      "min": 4.9,
-      "max": 113.2,
+      "min": 0.0,
+      "max": 117.2,
       "promedio": 27.7
     },
-    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 2.0-98.0",
+    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0",
     "ancho": {
       "pulgar": [
-        17.8,
-        7.3
+        24.5,
+        7.7
       ],
       "indice": [
-        9.6,
-        68.3
+        11.3,
+        82.1
       ],
       "medio": [
-        10.7,
-        77.3
+        12.7,
+        88.7
       ],
       "anular": [
-        11.7,
-        72.8
+        12.7,
+        77.1
       ],
       "menique": [
-        13.7,
-        94.6
+        14.9,
+        98.7
       ]
     }
   },
   "B": {
     "pulgar": {
-      "min": 94.0,
-      "max": 165.9,
+      "min": 92.8,
+      "max": 169.0,
       "promedio": 116.7
     },
     "indice": {
-      "min": 159.9,
-      "max": 176.1,
+      "min": 158.0,
+      "max": 180.0,
       "promedio": 168.9
     },
     "medio": {
-      "min": 160.2,
-      "max": 177.4,
+      "min": 157.5,
+      "max": 180.0,
       "promedio": 170.5
     },
     "anular": {
-      "min": 156.6,
-      "max": 178.8,
+      "min": 153.5,
+      "max": 180.0,
       "promedio": 171.6
     },
     "menique": {
-      "min": 161.6,
-      "max": 179.2,
+      "min": 159.3,
+      "max": 180.0,
       "promedio": 172.5
     },
-    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 2.0-98.0",
+    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0",
     "ancho": {
       "pulgar": [
-        19.3,
-        52.6
+        20.5,
+        55.6
       ],
       "indice": [
-        9.6,
-        6.7
+        11.4,
+        7.7
       ],
       "medio": [
-        10.8,
-        6.4
+        13.5,
+        7.2
       ],
       "anular": [
-        16.0,
-        6.3
+        19.1,
+        6.6
       ],
       "menique": [
-        11.6,
+        13.9,
         6.0
       ]
     }
   },
   "C": {
     "pulgar": {
-      "min": 135.3,
-      "max": 173.4,
+      "min": 132.1,
+      "max": 180.0,
       "promedio": 159.1
     },
     "indice": {
-      "min": 116.8,
-      "max": 169.2,
+      "min": 115.3,
+      "max": 171.0,
       "promedio": 139.2
     },
     "medio": {
-      "min": 107.7,
-      "max": 169.1,
+      "min": 106.2,
+      "max": 170.3,
       "promedio": 130.0
     },
     "anular": {
-      "min": 108.9,
-      "max": 168.9,
+      "min": 106.7,
+      "max": 171.7,
       "promedio": 132.4
     },
     "menique": {
-      "min": 123.5,
-      "max": 172.4,
+      "min": 120.6,
+      "max": 180.0,
       "promedio": 147.8
     },
-    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 2.0-98.0",
+    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0",
     "ancho": {
       "pulgar": [
-        26.2,
-        11.9
+        29.4,
+        13.1
       ],
       "indice": [
-        20.9,
-        31.5
+        22.4,
+        33.3
       ],
       "medio": [
-        20.0,
-        41.4
+        21.5,
+        42.6
       ],
       "anular": [
-        21.0,
-        38.9
+        23.3,
+        41.8
       ],
       "menique": [
-        24.0,
-        24.8
+        27.0,
+        25.7
       ]
     }
   },
   "L": {
     "pulgar": {
-      "min": 146.5,
-      "max": 177.5,
+      "min": 142.4,
+      "max": 180.0,
       "promedio": 167.1
     },
     "indice": {
-      "min": 160.4,
-      "max": 178.7,
+      "min": 157.2,
+      "max": 180.0,
       "promedio": 171.8
     },
     "medio": {
-      "min": 25.2,
-      "max": 107.4,
+      "min": 0.0,
+      "max": 113.5,
       "promedio": 51.1
     },
     "anular": {
-      "min": 12.5,
-      "max": 103.8,
+      "min": 0.0,
+      "max": 114.0,
       "promedio": 42.5
     },
     "menique": {
-      "min": 4.9,
-      "max": 114.4,
+      "min": 0.0,
+      "max": 121.7,
       "promedio": 40.0
     },
-    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 2.0-98.0",
+    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0",
     "ancho": {
       "pulgar": [
-        22.6,
-        8.4
+        26.7,
+        8.9
       ],
       "indice": [
-        12.3,
-        6.0
+        15.5,
+        6.2
       ],
       "medio": [
-        22.2,
-        60.1
+        25.0,
+        66.1
       ],
       "anular": [
-        26.5,
-        64.9
+        27.2,
+        75.1
       ],
       "menique": [
-        27.5,
-        82.0
+        28.7,
+        89.3
       ]
     }
   },
   "O": {
     "pulgar": {
-      "min": 156.7,
-      "max": 169.1,
-      "promedio": 162.9
+      "min": 111.5,
+      "max": 180.0,
+      "promedio": 152.2
     },
     "indice": {
-      "min": 73.0,
-      "max": 119.0,
-      "promedio": 96.0
+      "min": 55.6,
+      "max": 129.3,
+      "promedio": 95.9
     },
     "medio": {
-      "min": 69.5,
-      "max": 111.2,
-      "promedio": 90.3
+      "min": 0.0,
+      "max": 118.3,
+      "promedio": 86.0
     },
     "anular": {
-      "min": 69.7,
-      "max": 105.8,
-      "promedio": 87.7
+      "min": 0.0,
+      "max": 121.3,
+      "promedio": 83.9
     },
     "menique": {
-      "min": 81.2,
-      "max": 121.1,
-      "promedio": 101.2
+      "min": 36.5,
+      "max": 157.1,
+      "promedio": 101.7
+    },
+    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0",
+    "ancho": {
+      "pulgar": [
+        44.4,
+        13.5
+      ],
+      "indice": [
+        41.9,
+        31.9
+      ],
+      "medio": [
+        46.6,
+        30.6
+      ],
+      "anular": [
+        54.6,
+        35.9
+      ],
+      "menique": [
+        64.2,
+        56.5
+      ]
     }
   },
   "V": {
     "pulgar": {
-      "min": 119.8,
-      "max": 135.6,
-      "promedio": 127.7
+      "min": 99.5,
+      "max": 165.1,
+      "promedio": 129.4
     },
     "indice": {
-      "min": 175.5,
-      "max": 179.5,
-      "promedio": 177.5
+      "min": 166.4,
+      "max": 180.0,
+      "promedio": 174.6
     },
     "medio": {
-      "min": 176.1,
-      "max": 179.8,
-      "promedio": 178.0
+      "min": 156.2,
+      "max": 180.0,
+      "promedio": 172.8
     },
     "anular": {
-      "min": 25.5,
-      "max": 42.6,
-      "promedio": 34.0
+      "min": 0.0,
+      "max": 116.9,
+      "promedio": 56.2
     },
     "menique": {
-      "min": 27.8,
-      "max": 56.6,
-      "promedio": 42.2
+      "min": 0.0,
+      "max": 143.9,
+      "promedio": 65.7
+    },
+    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0",
+    "ancho": {
+      "pulgar": [
+        28.3,
+        37.3
+      ],
+      "indice": [
+        8.6,
+        6.0
+      ],
+      "medio": [
+        17.9,
+        6.0
+      ],
+      "anular": [
+        22.4,
+        66.2
+      ],
+      "menique": [
+        43.1,
+        84.8
+      ]
     }
   },
   "W": {
     "pulgar": {
-      "min": 113.3,
-      "max": 124.3,
-      "promedio": 118.8
+      "min": 90.9,
+      "max": 168.4,
+      "promedio": 125.0
     },
     "indice": {
-      "min": 173.0,
-      "max": 175.5,
-      "promedio": 174.2
+      "min": 164.3,
+      "max": 180.0,
+      "promedio": 172.0
     },
     "medio": {
-      "min": 172.2,
-      "max": 178.8,
-      "promedio": 175.5
+      "min": 157.7,
+      "max": 180.0,
+      "promedio": 170.0
     },
     "anular": {
-      "min": 170.7,
-      "max": 179.9,
-      "promedio": 175.3
+      "min": 105.8,
+      "max": 180.0,
+      "promedio": 168.5
     },
     "menique": {
-      "min": 31.6,
-      "max": 57.2,
-      "promedio": 44.4
+      "min": 0.0,
+      "max": 142.0,
+      "promedio": 69.1
+    },
+    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0",
+    "ancho": {
+      "pulgar": [
+        32.6,
+        44.9
+      ],
+      "indice": [
+        7.9,
+        6.2
+      ],
+      "medio": [
+        12.2,
+        8.8
+      ],
+      "anular": [
+        64.4,
+        8.6
+      ],
+      "menique": [
+        39.7,
+        77.6
+      ]
     }
   },
   "Y": {
     "pulgar": {
-      "min": 131.8,
-      "max": 178.5,
+      "min": 126.4,
+      "max": 180.0,
       "promedio": 165.7
     },
     "indice": {
-      "min": 5.3,
-      "max": 143.9,
+      "min": 0.0,
+      "max": 151.4,
       "promedio": 55.6
     },
     "medio": {
-      "min": 11.8,
-      "max": 137.0,
+      "min": 0.0,
+      "max": 143.0,
       "promedio": 63.6
     },
     "anular": {
-      "min": 12.2,
-      "max": 152.8,
+      "min": 0.0,
+      "max": 161.6,
       "promedio": 58.6
     },
     "menique": {
-      "min": 112.6,
-      "max": 178.6,
+      "min": 97.0,
+      "max": 180.0,
       "promedio": 168.6
     },
-    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 2.0-98.0",
+    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0",
     "ancho": {
       "pulgar": [
-        38.1,
-        8.6
+        43.5,
+        9.1
       ],
       "indice": [
-        44.9,
-        93.8
+        46.7,
+        101.3
       ],
       "medio": [
-        48.5,
-        76.7
+        51.0,
+        82.7
       ],
       "anular": [
-        38.8,
-        101.7
+        40.2,
+        110.5
       ],
       "menique": [
-        59.2,
+        74.8,
+        7.1
+      ]
+    }
+  },
+  "D": {
+    "pulgar": {
+      "min": 95.8,
+      "max": 180.0,
+      "promedio": 140.4
+    },
+    "indice": {
+      "min": 151.0,
+      "max": 180.0,
+      "promedio": 170.8
+    },
+    "medio": {
+      "min": 0.0,
+      "max": 163.4,
+      "promedio": 73.2
+    },
+    "anular": {
+      "min": 0.0,
+      "max": 135.5,
+      "promedio": 59.4
+    },
+    "menique": {
+      "min": 0.0,
+      "max": 168.0,
+      "promedio": 71.8
+    },
+    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0",
+    "ancho": {
+      "pulgar": [
+        46.2,
+        25.8
+      ],
+      "indice": [
+        21.2,
+        7.0
+      ],
+      "medio": [
+        30.9,
+        97.0
+      ],
+      "anular": [
+        30.6,
+        84.1
+      ],
+      "menique": [
+        45.7,
+        107.6
+      ]
+    }
+  },
+  "E": {
+    "pulgar": {
+      "min": 79.5,
+      "max": 164.5,
+      "promedio": 114.7
+    },
+    "indice": {
+      "min": 0.0,
+      "max": 136.2,
+      "promedio": 79.5
+    },
+    "medio": {
+      "min": 0.0,
+      "max": 112.5,
+      "promedio": 63.1
+    },
+    "anular": {
+      "min": 0.0,
+      "max": 122.1,
+      "promedio": 50.3
+    },
+    "menique": {
+      "min": 0.0,
+      "max": 153.1,
+      "promedio": 63.6
+    },
+    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0",
+    "ancho": {
+      "pulgar": [
+        32.7,
+        52.4
+      ],
+      "indice": [
+        30.6,
+        57.9
+      ],
+      "medio": [
+        36.9,
+        50.0
+      ],
+      "anular": [
+        39.1,
+        73.4
+      ],
+      "menique": [
+        50.8,
+        92.7
+      ]
+    }
+  },
+  "F": {
+    "pulgar": {
+      "min": 139.4,
+      "max": 180.0,
+      "promedio": 159.6
+    },
+    "indice": {
+      "min": 53.0,
+      "max": 177.3,
+      "promedio": 95.7
+    },
+    "medio": {
+      "min": 149.3,
+      "max": 180.0,
+      "promedio": 170.4
+    },
+    "anular": {
+      "min": 103.6,
+      "max": 180.0,
+      "promedio": 173.1
+    },
+    "menique": {
+      "min": 159.4,
+      "max": 180.0,
+      "promedio": 170.5
+    },
+    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0",
+    "ancho": {
+      "pulgar": [
+        20.6,
+        16.5
+      ],
+      "indice": [
+        25.8,
+        98.5
+      ],
+      "medio": [
+        22.0,
+        7.4
+      ],
+      "anular": [
+        71.5,
+        6.0
+      ],
+      "menique": [
+        11.7,
         6.9
+      ]
+    }
+  },
+  "G": {
+    "pulgar": {
+      "min": 146.8,
+      "max": 180.0,
+      "promedio": 169.1
+    },
+    "indice": {
+      "min": 157.5,
+      "max": 180.0,
+      "promedio": 173.4
+    },
+    "medio": {
+      "min": 0.0,
+      "max": 157.2,
+      "promedio": 64.9
+    },
+    "anular": {
+      "min": 0.0,
+      "max": 170.3,
+      "promedio": 73.6
+    },
+    "menique": {
+      "min": 0.0,
+      "max": 171.8,
+      "promedio": 85.9
+    },
+    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0",
+    "ancho": {
+      "pulgar": [
+        24.3,
+        7.9
+      ],
+      "indice": [
+        16.6,
+        6.0
+      ],
+      "medio": [
+        52.4,
+        98.7
+      ],
+      "anular": [
+        55.3,
+        107.6
+      ],
+      "menique": [
+        67.5,
+        92.3
+      ]
+    }
+  },
+  "H": {
+    "pulgar": {
+      "min": 146.3,
+      "max": 180.0,
+      "promedio": 169.7
+    },
+    "indice": {
+      "min": 159.6,
+      "max": 180.0,
+      "promedio": 172.8
+    },
+    "medio": {
+      "min": 143.0,
+      "max": 180.0,
+      "promedio": 173.5
+    },
+    "anular": {
+      "min": 0.0,
+      "max": 154.0,
+      "promedio": 41.4
+    },
+    "menique": {
+      "min": 0.0,
+      "max": 160.1,
+      "promedio": 70.0
+    },
+    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0",
+    "ancho": {
+      "pulgar": [
+        25.2,
+        7.5
+      ],
+      "indice": [
+        13.7,
+        6.0
+      ],
+      "medio": [
+        31.8,
+        6.0
+      ],
+      "anular": [
+        30.7,
+        119.3
+      ],
+      "menique": [
+        52.3,
+        96.1
+      ]
+    }
+  },
+  "I": {
+    "pulgar": {
+      "min": 87.1,
+      "max": 170.3,
+      "promedio": 127.5
+    },
+    "indice": {
+      "min": 0.0,
+      "max": 118.7,
+      "promedio": 54.9
+    },
+    "medio": {
+      "min": 0.0,
+      "max": 124.0,
+      "promedio": 51.7
+    },
+    "anular": {
+      "min": 0.0,
+      "max": 113.7,
+      "promedio": 41.1
+    },
+    "menique": {
+      "min": 107.0,
+      "max": 180.0,
+      "promedio": 163.2
+    },
+    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0",
+    "ancho": {
+      "pulgar": [
+        41.6,
+        41.6
+      ],
+      "indice": [
+        20.9,
+        68.2
+      ],
+      "medio": [
+        28.3,
+        75.7
+      ],
+      "anular": [
+        26.9,
+        77.4
+      ],
+      "menique": [
+        57.2,
+        13.6
+      ]
+    }
+  },
+  "M": {
+    "pulgar": {
+      "min": 115.8,
+      "max": 180.0,
+      "promedio": 143.5
+    },
+    "indice": {
+      "min": 160.1,
+      "max": 180.0,
+      "promedio": 170.2
+    },
+    "medio": {
+      "min": 156.2,
+      "max": 180.0,
+      "promedio": 171.0
+    },
+    "anular": {
+      "min": 73.4,
+      "max": 180.0,
+      "promedio": 163.9
+    },
+    "menique": {
+      "min": 44.9,
+      "max": 176.6,
+      "promedio": 112.6
+    },
+    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0",
+    "ancho": {
+      "pulgar": [
+        29.0,
+        21.8
+      ],
+      "indice": [
+        10.3,
+        7.3
+      ],
+      "medio": [
+        15.3,
+        7.3
+      ],
+      "anular": [
+        98.3,
+        7.1
+      ],
+      "menique": [
+        66.6,
+        65.1
+      ]
+    }
+  },
+  "N": {
+    "pulgar": {
+      "min": 111.1,
+      "max": 160.5,
+      "promedio": 138.3
+    },
+    "indice": {
+      "min": 166.7,
+      "max": 180.0,
+      "promedio": 173.2
+    },
+    "medio": {
+      "min": 64.9,
+      "max": 180.0,
+      "promedio": 170.7
+    },
+    "anular": {
+      "min": 0.0,
+      "max": 107.6,
+      "promedio": 62.3
+    },
+    "menique": {
+      "min": 0.0,
+      "max": 124.7,
+      "promedio": 87.1
+    },
+    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0",
+    "ancho": {
+      "pulgar": [
+        27.6,
+        21.8
+      ],
+      "indice": [
+        6.6,
+        6.0
+      ],
+      "medio": [
+        108.9,
+        6.0
+      ],
+      "anular": [
+        48.3,
+        44.4
+      ],
+      "menique": [
+        43.9,
+        38.1
+      ]
+    }
+  },
+  "P": {
+    "pulgar": {
+      "min": 128.4,
+      "max": 180.0,
+      "promedio": 162.5
+    },
+    "indice": {
+      "min": 151.6,
+      "max": 180.0,
+      "promedio": 172.7
+    },
+    "medio": {
+      "min": 63.7,
+      "max": 180.0,
+      "promedio": 144.9
+    },
+    "anular": {
+      "min": 0.0,
+      "max": 123.6,
+      "promedio": 74.5
+    },
+    "menique": {
+      "min": 0.0,
+      "max": 142.3,
+      "promedio": 74.6
+    },
+    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0",
+    "ancho": {
+      "pulgar": [
+        35.8,
+        11.0
+      ],
+      "indice": [
+        22.5,
+        6.0
+      ],
+      "medio": [
+        84.8,
+        26.4
+      ],
+      "anular": [
+        41.2,
+        48.3
+      ],
+      "menique": [
+        40.0,
+        70.7
+      ]
+    }
+  },
+  "R": {
+    "pulgar": {
+      "min": 96.2,
+      "max": 166.2,
+      "promedio": 130.4
+    },
+    "indice": {
+      "min": 157.2,
+      "max": 180.0,
+      "promedio": 171.4
+    },
+    "medio": {
+      "min": 120.0,
+      "max": 180.0,
+      "promedio": 167.4
+    },
+    "anular": {
+      "min": 0.0,
+      "max": 117.8,
+      "promedio": 53.5
+    },
+    "menique": {
+      "min": 0.0,
+      "max": 152.1,
+      "promedio": 69.6
+    },
+    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0",
+    "ancho": {
+      "pulgar": [
+        34.1,
+        36.0
+      ],
+      "indice": [
+        14.4,
+        7.2
+      ],
+      "medio": [
+        50.2,
+        8.6
+      ],
+      "anular": [
+        17.8,
+        70.0
+      ],
+      "menique": [
+        33.3,
+        89.5
+      ]
+    }
+  },
+  "S": {
+    "pulgar": {
+      "min": 81.3,
+      "max": 168.8,
+      "promedio": 125.9
+    },
+    "indice": {
+      "min": 0.0,
+      "max": 135.6,
+      "promedio": 64.2
+    },
+    "medio": {
+      "min": 0.0,
+      "max": 129.1,
+      "promedio": 46.7
+    },
+    "anular": {
+      "min": 0.0,
+      "max": 108.4,
+      "promedio": 36.7
+    },
+    "menique": {
+      "min": 0.0,
+      "max": 124.8,
+      "promedio": 38.9
+    },
+    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0",
+    "ancho": {
+      "pulgar": [
+        44.7,
+        42.8
+      ],
+      "indice": [
+        14.3,
+        77.6
+      ],
+      "medio": [
+        15.2,
+        88.7
+      ],
+      "anular": [
+        16.3,
+        78.9
+      ],
+      "menique": [
+        25.5,
+        93.3
+      ]
+    }
+  },
+  "T": {
+    "pulgar": {
+      "min": 114.1,
+      "max": 180.0,
+      "promedio": 142.6
+    },
+    "indice": {
+      "min": 0.0,
+      "max": 132.5,
+      "promedio": 72.1
+    },
+    "medio": {
+      "min": 0.0,
+      "max": 130.0,
+      "promedio": 52.8
+    },
+    "anular": {
+      "min": 0.0,
+      "max": 121.5,
+      "promedio": 46.6
+    },
+    "menique": {
+      "min": 0.0,
+      "max": 129.7,
+      "promedio": 47.8
+    },
+    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0",
+    "ancho": {
+      "pulgar": [
+        28.8,
+        27.6
+      ],
+      "indice": [
+        26.6,
+        63.2
+      ],
+      "medio": [
+        26.0,
+        84.2
+      ],
+      "anular": [
+        25.9,
+        82.5
+      ],
+      "menique": [
+        24.1,
+        92.3
+      ]
+    }
+  },
+  "U": {
+    "pulgar": {
+      "min": 99.5,
+      "max": 166.4,
+      "promedio": 127.8
+    },
+    "indice": {
+      "min": 165.3,
+      "max": 180.0,
+      "promedio": 174.0
+    },
+    "medio": {
+      "min": 158.7,
+      "max": 180.0,
+      "promedio": 173.5
+    },
+    "anular": {
+      "min": 0.0,
+      "max": 98.5,
+      "promedio": 50.6
+    },
+    "menique": {
+      "min": 0.0,
+      "max": 135.4,
+      "promedio": 62.8
+    },
+    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0",
+    "ancho": {
+      "pulgar": [
+        27.7,
+        39.3
+      ],
+      "indice": [
+        9.2,
+        6.0
+      ],
+      "medio": [
+        16.3,
+        6.0
+      ],
+      "anular": [
+        19.1,
+        52.2
+      ],
+      "menique": [
+        32.4,
+        77.0
       ]
     }
   }

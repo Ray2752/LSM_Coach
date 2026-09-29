@@ -5,7 +5,7 @@
 import unittest
 
 from evaluation import CONFIG, ORIENT, evaluate
-from tolerance_calculator import _range, rotate_upright
+from tolerance_calculator import _range, one_sided, rotate_upright
 
 TOL = {f: {"min": 160.0, "max": 180.0} for f in ("pulgar", "indice", "medio", "anular", "menique")}
 TOL_ORIENT = {**TOL, "orientacion": {"roll": {"min": -10, "max": 10},
@@ -62,6 +62,18 @@ class RangeTests(unittest.TestCase):
     def test_limites_fisicos(self):
         r = _range([5.0, 175.0], margin=2.0, floor=6.0, lo_limit=0.0, hi_limit=180.0)
         self.assertEqual((r["min"], r["max"]), (0.0, 180.0))
+
+
+class OneSidedTests(unittest.TestCase):
+    def test_dedo_cerrado_no_puede_estar_demasiado_cerrado(self):
+        self.assertEqual(one_sided({"min": 40, "max": 110, "promedio": 60})["min"], 0.0)
+
+    def test_dedo_extendido_no_puede_estar_demasiado_extendido(self):
+        self.assertEqual(one_sided({"min": 150, "max": 175, "promedio": 165})["max"], 180.0)
+
+    def test_dedo_curvado_conserva_ambos_limites(self):
+        self.assertEqual(one_sided({"min": 100, "max": 160, "promedio": 125}),
+                         {"min": 100, "max": 160, "promedio": 125})
 
 
 class RotateUprightTests(unittest.TestCase):

@@ -25,9 +25,9 @@ import os
 import statistics
 from collections import defaultdict
 
-from evaluation import evaluate
+from evaluation import evaluate, shape_issue
 from import_msl import PUBLIC_DIR, SOURCE
-from tolerance_calculator import DATA_DIR, FINGER_JOINTS, LANDMARK_COLUMNS, OUTPUT_FILE
+from tolerance_calculator import DATA_DIR, FINGER_JOINTS, LANDMARK_COLUMNS, OUTPUT_FILE, one_sided
 
 PERCENTILES = ((5, 95), (3, 97), (2, 98), (1, 99))
 FLOOR = 6.0          # holgura mínima (grados) a cada lado de la mediana
@@ -58,8 +58,8 @@ def pct_range(values, lo, hi):
     med = statistics.median(values)
     low = min(pct(values, lo), med - FLOOR)
     high = max(pct(values, hi), med + FLOOR)
-    return {"min": round(max(low, 0.0), 1), "max": round(min(high, 180.0), 1),
-            "promedio": round(statistics.mean(values), 1)}
+    return one_sided({"min": round(max(low, 0.0), 1), "max": round(min(high, 180.0), 1),
+                      "promedio": round(statistics.mean(values), 1)})
 
 
 def ranges_from(rows, lo, hi):
@@ -85,8 +85,9 @@ def personal_ranges(widths, calib_rows):
     for k, (down, up) in widths.items():
         values = [r[2][k] for r in calib_rows]
         med = statistics.median(values)
-        tol[k] = {"min": round(max(med - down, 0.0), 1), "max": round(min(med + up, 180.0), 1),
-                  "promedio": round(statistics.mean(values), 1)}
+        tol[k] = one_sided({"min": round(max(med - down, 0.0), 1),
+                            "max": round(min(med + up, 180.0), 1),
+                            "promedio": round(statistics.mean(values), 1)})
     return tol
 
 
@@ -214,13 +215,24 @@ def main():
         clf = make_model()
         clf.fit([f for _, f in tr], [s for s, _ in tr])
         proba = clf.predict_proba([f for _, _, f in te])
-        col = {c: i for i, c in enumerate(clf.classes_)}
-        hit = sum(clf.classes_[p.argmax()] == s for p, (s, _, _) in zip(proba, te))
+        pred = [clf.classes_[p.argmax()] for p in proba]
+        hit = sum(p == s for p, (s, _, _) in zip(pred, te))
         print(f"\nClasificador (reconoce la letra), personas no vistas: {100 * hit / len(te):.1f}%")
+        by_sign = defaultdict(list)
+        for p, (s, _, _) in zip(pred, te):
+            by_sign[s].append(p)
+        weak = []
+        for s, ps in sorted(by_sign.items()):
+            acc = sum(p == s for p in ps) / len(ps)
+            if acc < 0.9:
+                worst = max((p for p in set(ps) if p != s), key=ps.count)
+                weak.append(f"{s} {100 * acc:.0f}% (la confunde con {worst})")
+        if weak:
+            print("  Letras por debajo de 90 %: " + ", ".join(weak))
         tp = fp = npos = nneg = 0
         for sign, tol in tols.items():
             for p, (real, angles, _) in zip(proba, te):
-                passed = ok(angles, tol) and p[col[sign]] >= 0.5
+                passed = ok(angles, tol) and shape_issue(dict(zip(clf.classes_, p)), sign) is None
                 npos += real == sign
                 nneg += real != sign
                 tp += passed and real == sign

@@ -23,13 +23,13 @@ import time
 
 import cv2
 import uvicorn
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi import FastAPI, WebSocket
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from coach_engine import Coach
 from imu_source import BLEIMU, MockIMU
-from signs import NIVEL_1, SIGNS
+from signs import ABECEDARIO, DYNAMIC, NIVEL_1, SIGNS, level, ref_name
 from store import Store
 from tolerance_calculator import OUTPUT_FILE, append_sample
 
@@ -62,27 +62,46 @@ def load_model(path="model.joblib"):
 
 
 class Camera:
-    """Lee una cámara en su propio hilo y guarda el último fotograma (ya en espejo)."""
+    """Lee una cámara en su propio hilo y guarda el último fotograma (ya en espejo).
+    Si deja de mandar imagen (se desconectó o cambió de índice), la vuelve a abrir."""
+
+    REOPEN_AFTER_S = 2.0
 
     def __init__(self, index, width=1280, height=720):
-        self.cap = cv2.VideoCapture(index)
+        self.index, self.width, self.height = index, width, height
+        self.cap = self._open()
         if not self.cap.isOpened():
             sys.exit(f"No se pudo abrir la cámara {index}. Prueba: python web_server.py --list-cams")
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
-        self.index, self.frame, self.seq = index, None, 0
+        self.frame, self.seq, self.last_t = None, 0, time.time()
         self._lock = threading.Lock()
         threading.Thread(target=self._run, daemon=True).start()
+
+    def _open(self):
+        cap = cv2.VideoCapture(self.index)
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
+        return cap
+
+    @property
+    def live(self):
+        return time.time() - self.last_t < 1.5
 
     def _run(self):
         while True:
             ok, frame = self.cap.read()
             if not ok:
+                if time.time() - self.last_t > self.REOPEN_AFTER_S:
+                    print(f"Cámara {self.index} sin imagen: reabriendo...", file=sys.stderr)
+                    self.cap.release()
+                    time.sleep(1)
+                    self.cap = self._open()
+                    self.last_t = time.time()  # espera otra vez antes de reintentar
                 time.sleep(0.05)
                 continue
             with self._lock:
                 self.frame = cv2.flip(frame, 1)  # igual que al grabar
                 self.seq += 1
+                self.last_t = time.time()
 
     def read(self):
         with self._lock:
@@ -152,10 +171,10 @@ class Runtime:
     def status(self):
         v = self.imu_values()
         return {
-            "signs": NIVEL_1,
             "imu": {"mode": self.args.imu, "connected": v is not None,
                     **({k: round(x, 1) for k, x in v.items()} if v else {})},
-            "fps": round(self.fps, 1),
+            "fps": round(self.fps, 1) if self.cams[0].live else 0,
+            "camera_live": self.cams[0].live,
             "cameras": len(self.cams),
             "person": self.person,
             "progress": dict(self.coach.progress),
@@ -190,6 +209,8 @@ class Runtime:
     def record(self, is_error):
         with self._lock:
             sample, sign = self.coach.last_sample, self.coach.target
+        if sign in DYNAMIC:  # una sola imagen no captura el movimiento: dañaría el modelo
+            return self.notify(f"La {sign} lleva movimiento: todavía no se puede grabar", "bad")
         if sample is None:
             return self.notify("No veo la mano: no se guardó", "bad")
         if self.imu and sample["imu"] is None:
@@ -211,6 +232,13 @@ def encode(frame):
 app = FastAPI(title="LSM Coach")
 app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
 rt: Runtime = None  # se crea en main()
+server: uvicorn.Server = None  # también en main(); sirve para saber si se está apagando
+
+
+def stopping():
+    """True al pulsar Ctrl+C: el video y el WebSocket (conexiones sin fin) se cierran solos
+    para que el servidor se apague con un solo Ctrl+C y sin errores."""
+    return server is not None and server.should_exit
 
 
 @app.get("/")
@@ -218,16 +246,24 @@ def index():
     return FileResponse(os.path.join(WEB_DIR, "index.html"))
 
 
+@app.get("/favicon.ico")
+def favicon():
+    return Response(status_code=204)  # sin ícono: evita un 404 en cada carga
+
+
 @app.get("/api/signs")
 def api_signs():
     out = []
-    for sign in NIVEL_1:
+    for sign in ABECEDARIO:
         tol = rt.tolerances.get(sign)
+        dynamic = sign in DYNAMIC
         info = {k: v for k, v in SIGNS[sign].items() if k != "forma"}
         out.append({
-            **info, "sign": sign, "calibrated": tol is not None,
+            **info, "sign": sign, "level": level(sign), "dynamic": dynamic,
+            "calibrated": tol is not None,
             "shape": SIGNS[sign].get("forma", {}),
             "orientation": bool(tol and tol.get("orientacion")),
+            "ref": f"/static/ref/{ref_name(sign, 'gif' if dynamic else 'jpg')}",
         })
     return out
 
@@ -236,7 +272,7 @@ def api_signs():
 async def video(index: int):
     async def frames():
         last = None
-        while True:
+        while not stopping():
             jpg = rt.jpeg[index] if index < len(rt.jpeg) else None
             if jpg is not None and jpg is not last:
                 last = jpg
@@ -250,8 +286,8 @@ async def ws_endpoint(ws: WebSocket):
     await ws.accept()
 
     async def sender():
-        while True:
-            await ws.send_text(json.dumps(rt.state))
+        while not stopping():  # el estado de los dispositivos siempre fresco
+            await ws.send_text(json.dumps({**rt.state, **rt.status()}))
             await asyncio.sleep(1 / STATE_HZ)
 
     async def receiver():
@@ -259,13 +295,14 @@ async def ws_endpoint(ws: WebSocket):
             rt.command(await ws.receive_json())
 
     tasks = [asyncio.create_task(sender()), asyncio.create_task(receiver())]
-    try:
-        await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
-    except WebSocketDisconnect:
-        pass
-    finally:
-        for t in tasks:
-            t.cancel()
+    # termina cuando el navegador se va (receiver falla) o el servidor se apaga (sender acaba)
+    done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+    for t in pending:
+        t.cancel()
+    for t in done:
+        t.exception()  # el navegador se fue (WebSocketDisconnect): no es un error
+    if stopping():
+        await ws.close()
 
 
 def list_cams(max_index=6):
@@ -290,11 +327,11 @@ def list_cams(max_index=6):
 
 
 def main():
-    global rt
+    global rt, server
     ap = argparse.ArgumentParser(description="Interfaz web de LSM Coach")
     ap.add_argument("--cam", type=int, default=0, help="cámara principal (evalúa la seña)")
     ap.add_argument("--cam2", type=int, help="segunda cámara (vista adicional)")
-    ap.add_argument("--sign", default=NIVEL_1[0], choices=NIVEL_1, help="seña inicial")
+    ap.add_argument("--sign", default=NIVEL_1[0], choices=ABECEDARIO, help="seña inicial")
     ap.add_argument("--imu", choices=["ble", "none", "mock"], default="ble",
                     help="ble = Nano real (por defecto); mock solo para pruebas, NO en la demo")
     ap.add_argument("--host", default="127.0.0.1",
@@ -306,8 +343,10 @@ def main():
         return list_cams()
 
     rt = Runtime(args)
-    print(f"Abre http://localhost:{args.port} en el monitor (pantalla completa).")
-    uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
+    print(f"Abre http://localhost:{args.port} en el monitor (pantalla completa). Ctrl+C para salir.")
+    server = uvicorn.Server(uvicorn.Config(app, host=args.host, port=args.port, log_level="warning",
+                                           timeout_graceful_shutdown=2))
+    server.run()
 
 
 if __name__ == "__main__":

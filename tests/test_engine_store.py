@@ -6,8 +6,8 @@ import os
 import tempfile
 import unittest
 
-from coach_engine import MIN_GAP_S, PERSIST_S, REPEAT_S, AlertPolicy, shape_issue
-from evaluation import CONFIG
+from coach_engine import MIN_GAP_S, PERSIST_S, REPEAT_S, AlertPolicy
+from evaluation import CONFIG, shape_issue
 from store import Store
 
 
@@ -42,14 +42,22 @@ class ShapeIssueTests(unittest.TestCase):
     def test_forma_reconocida(self):
         self.assertIsNone(shape_issue({"A": 0.8, "Y": 0.2}, "A"))
 
+    def test_probabilidad_repartida_entre_letras_parecidas_no_rechaza(self):
+        self.assertIsNone(shape_issue({"A": 0.35, "S": 0.3, "T": 0.2, "E": 0.15}, "A"))
+
     def test_se_parece_a_otra_letra(self):
         issue = shape_issue({"C": 0.7, "Y": 0.3}, "Y")
         self.assertEqual(issue.parameter, CONFIG)
         self.assertEqual(issue.action, "Ajusta la forma: se parece más a una C")
 
-    def test_la_mas_probable_pero_con_poca_confianza(self):
-        issue = shape_issue({"A": 0.4, "B": 0.3, "C": 0.3}, "A")
-        self.assertEqual(issue.action, "Ajusta la forma de la mano")
+
+    def test_error_tipico_de_la_misma_letra(self):
+        issue = shape_issue({"B": 0.2, "B_mal": 0.7, "C": 0.1}, "B")
+        self.assertEqual(issue.action, "Revisa la B: dedos separados o semiflexionados")
+
+    def test_error_de_otra_letra_se_reporta_como_esa_letra(self):
+        issue = shape_issue({"Y": 0.1, "C": 0.2, "C_mal": 0.7}, "Y")
+        self.assertEqual(issue.action, "Ajusta la forma: se parece más a una C")
 
     def test_letra_que_el_modelo_no_conoce(self):
         self.assertIsNone(shape_issue({"A": 1.0}, "J"))

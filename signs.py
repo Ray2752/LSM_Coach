@@ -1,10 +1,20 @@
-"""Catálogo de señas del alcance (Documento oficial del reto, sección 4).
+"""Catálogo de señas: el abecedario completo de LSM (27 letras).
 
-Las descripciones son las "generales y orientativas" del documento; la valoración
-final de qué es una seña correcta corresponde a los expertos en LSM del panel.
+Niveles del reto (Documento oficial, sección 4): Nivel 1 = A, B, C, L, Y (estáticas,
+obligatorio); Nivel 2 = J, Ñ, Q, X, Z (con movimiento). Las demás letras están fuera
+del alcance que se califica, pero la app las incluye para practicar todo el abecedario.
+
+Las descripciones de las 10 letras del reto son las "generales y orientativas" del
+documento; la valoración final de qué es una seña correcta corresponde a los expertos
+en LSM. Para las demás letras la app muestra la imagen de referencia del dataset.
 """
 
-NIVEL_1 = ["A", "B", "C", "L", "Y"]  # letras estáticas (obligatorio)
+NIVEL_1 = ["A", "B", "C", "L", "Y"]   # letras estáticas del reto (obligatorio)
+NIVEL_2 = ["J", "Ñ", "Q", "X", "Z"]   # letras con movimiento del reto
+ABECEDARIO = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "Ñ",
+              "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"]
+DYNAMIC = ["J", "K", "Ñ", "Q", "X", "Z"]  # llevan movimiento
+STATIC = [s for s in ABECEDARIO if s not in DYNAMIC]
 
 # "forma": cómo va cada dedo, para mostrarlo al aprendiz (según la descripción del reto)
 SIGNS = {
@@ -28,7 +38,29 @@ SIGNS = {
           "error_tipico": "Anular o índice parcialmente extendidos.",
           "forma": {"pulgar": "extendido", "indice": "cerrado", "medio": "cerrado",
                     "anular": "cerrado", "menique": "extendido"}},
+    "J": {"descripcion": "Meñique extendido que traza un movimiento en el aire.",
+          "error_tipico": "Movimiento incompleto o trazado en sentido incorrecto."},
+    "Ñ": {"descripcion": "Configuración de la N con un movimiento ondulante.",
+          "error_tipico": "Omitir el movimiento; configuración base incorrecta."},
+    "Q": {"descripcion": "Configuración específica con movimiento de la mano o muñeca.",
+          "error_tipico": "Giro ausente o exagerado; orientación incorrecta."},
+    "X": {"descripcion": "Dedo índice en gancho con movimiento.",
+          "error_tipico": "Índice recto en lugar de en gancho; sin movimiento."},
+    "Z": {"descripcion": "Dedo índice que traza la forma de la “Z” en el aire.",
+          "error_tipico": "Trazo incompleto, invertido o demasiado pequeño."},
 }
+for _sign in ABECEDARIO:  # el resto del abecedario: se guía con la imagen de referencia
+    SIGNS.setdefault(_sign, {"descripcion": "Observa la imagen de referencia.",
+                             "error_tipico": ""})
+
+
+def level(sign):
+    return 1 if sign in NIVEL_1 else 2 if sign in NIVEL_2 else 0
+
+
+def ref_name(sign, ext):
+    """Nombre de archivo ASCII de la referencia (la Ñ no va bien en todas las rutas)."""
+    return f"{'NN' if sign == 'Ñ' else sign}.{ext}"
 
 
 def describe(sign):

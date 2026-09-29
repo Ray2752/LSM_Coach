@@ -9,6 +9,7 @@
 <body>
   <header class="top">
     <div class="brand">LSM Coach <span>Seña correcta</span></div>
+    <div id="progress" class="progress" aria-label="Señas logradas"></div>
     <div class="status" aria-live="polite">
       <span id="st-imu" class="pill">Muñequera</span>
       <span id="st-cam" class="pill">Cámara</span>
@@ -31,10 +32,11 @@
         <div class="label">Seña objetivo</div>
         <div class="target-row">
           <div id="target-letter" class="letter">–</div>
-          <div>
+          <div class="target-text">
             <p id="target-desc" class="desc"></p>
             <p id="target-typical" class="muted"></p>
           </div>
+          <img id="target-ref" class="ref" alt="Referencia de la seña" hidden>
         </div>
         <ul id="target-shape" class="shape"></ul>
       </section>
@@ -57,9 +59,13 @@
   </main>
 
   <footer class="bar">
+    <div id="groups" class="groups" role="tablist" aria-label="Grupo de señas">
+      <button data-group="1" role="tab">Nivel 1</button>
+      <button data-group="2" role="tab">Nivel 2</button>
+      <button data-group="all" role="tab">Abecedario</button>
+    </div>
     <div id="sign-buttons" class="signs" role="group" aria-label="Elegir seña"></div>
-    <button id="speak" class="action">Escuchar corrección <kbd>Espacio</kbd></button>
-    <div id="progress" class="progress" aria-label="Señas logradas"></div>
+    <button id="speak" class="action">Escuchar <kbd>Espacio</kbd></button>
     <button id="calib-toggle" class="ghost" aria-expanded="false">Calibración</button>
   </footer>
 
@@ -71,6 +77,7 @@
   </div>
 
   <div id="toast" class="toast" role="status" hidden></div>
+  <p class="credits">Imágenes de referencia: MSL Alphabet (Morfín; Navarrete-López y López-Nava), Zenodo, CC BY 4.0</p>
   <script src="/static/app.js"></script>
 </body>
 </html>

@@ -13,7 +13,7 @@ from dataclasses import asdict
 import cv2
 import mediapipe as mp
 
-from evaluation import CONFIG, FINGER_LABEL, Issue, evaluate
+from evaluation import CONFIG, ERROR_SUFFIX, FINGER_LABEL, evaluate, shape_issue
 from signs import NIVEL_1
 from tolerance_calculator import FINGER_JOINTS, landmarks_to_angles, landmarks_to_features
 
@@ -22,19 +22,7 @@ PERSIST_S = 0.6   # el error debe durar esto para avisar (evita avisos por parpa
 REPEAT_S = 6.0    # si sigues con el MISMO error, se repite hasta pasado este tiempo
 MIN_GAP_S = 1.5   # pausa mínima entre dos avisos cualquiera
 HOLD_OK_S = 1.0   # la seña debe mantenerse correcta este tiempo para contarla como lograda
-SHAPE_MIN_PROB = 0.5  # el clasificador debe reconocer la letra objetivo con esta confianza
 RED = (80, 80, 255)
-
-
-def shape_issue(probs, target, min_prob=SHAPE_MIN_PROB):
-    """probs: {letra: probabilidad} del clasificador. Devuelve un Issue si la forma de
-    la mano no se reconoce como `target` (None si está bien o si el modelo no la conoce)."""
-    if target not in probs or probs[target] >= min_prob:
-        return None
-    best = max(probs, key=probs.get)
-    action = (f"Ajusta la forma: se parece más a una {best}" if best != target
-              else "Ajusta la forma de la mano")
-    return Issue(CONFIG, "forma", action)
 
 
 class AlertPolicy:
@@ -128,8 +116,9 @@ class Coach:
         result = evaluate(angles, imu, tol, require_imu=self.require_imu)
         probs = self._shape_probs(self.last_sample["landmarks"])
         if probs:
-            state["shape"] = {"best": max(probs, key=probs.get),
-                              "target": round(probs.get(self.target, 0.0), 2)}
+            letters = {k: v for k, v in probs.items() if not k.endswith(ERROR_SUFFIX)}
+            state["shape"] = {"best": max(letters, key=letters.get),
+                              "error": round(probs.get(self.target + ERROR_SUFFIX, 0.0), 2)}
             issue = shape_issue(probs, self.target)
             finger_wrong = any(i.parameter == CONFIG for i in result.issues)
             if issue and not finger_wrong:  # si ya falla un dedo, esa instrucción es más útil

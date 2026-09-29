@@ -10,6 +10,11 @@ let ws = null;
 let shownTarget = null; // seña cuya tarjeta está dibujada
 let lastMessageId = 0;
 let toastTimer = null;
+let group = loadGroup(); // grupo de señas visible: '1', '2' o 'all'
+
+function loadGroup() {
+  try { return localStorage.getItem('lsm-group') || '1'; } catch { return '1'; }
+}
 
 // ---------- conexión ----------
 function connect() {
@@ -29,20 +34,38 @@ function send(msg) {
 
 async function loadCatalog() {
   catalog = await (await fetch('/api/signs')).json();
-  const box = $('sign-buttons');
-  box.replaceChildren(...catalog.map((s, i) => {
-    const b = document.createElement('button');
-    b.innerHTML = `<span class="n">${i + 1}</span>${s.sign}`;
-    b.dataset.sign = s.sign;
-    b.title = s.calibrated ? s.descripcion : `${s.descripcion} (sin calibrar)`;
-    b.classList.toggle('uncal', !s.calibrated);
-    b.onclick = () => { chooseSign(s.sign); b.blur(); };  // sin foco: Espacio no lo "presiona"
-    return b;
-  }));
+  renderSignButtons();
   shownTarget = null;
 }
 
+const inGroup = (s) => group === 'all' || String(s.level) === group;
+
+function setGroup(g) {
+  group = g;
+  try { localStorage.setItem('lsm-group', g); } catch { /* sin almacenamiento: no pasa nada */ }
+  renderSignButtons();
+}
+
+function renderSignButtons() {
+  document.querySelectorAll('#groups button').forEach((b) =>
+    b.setAttribute('aria-selected', String(b.dataset.group === group)));
+  const box = $('sign-buttons');
+  box.classList.toggle('compact', group === 'all');
+  box.replaceChildren(...catalog.filter(inGroup).map((s) => {
+    const b = document.createElement('button');
+    b.innerHTML = `${s.sign}${s.dynamic ? '<span class="mov">↻</span>' : ''}`;
+    b.dataset.sign = s.sign;
+    b.title = s.descripcion + (s.calibrated ? '' : ' (aún no evaluable)');
+    b.classList.toggle('uncal', !s.calibrated);
+    b.setAttribute('aria-pressed', String(s.sign === shownTarget));
+    b.onclick = () => { chooseSign(s.sign); b.blur(); };  // sin foco: Espacio no lo "presiona"
+    return b;
+  }));
+}
+
 function chooseSign(sign) {
+  const info = catalog.find((c) => c.sign === sign);
+  if (info && !inGroup(info)) setGroup('all');
   send({ type: 'target', sign });
 }
 
@@ -69,6 +92,9 @@ function renderTarget(sign) {
   const info = catalog.find((c) => c.sign === sign) || { sign, descripcion: '', error_tipico: '', shape: {} };
   $('target-letter').textContent = sign;
   $('target-desc').textContent = info.descripcion;
+  const ref = $('target-ref');
+  ref.hidden = !info.ref;
+  if (info.ref) { ref.src = info.ref; ref.alt = `Referencia de la ${sign}`; }
   $('target-typical').textContent = info.error_tipico ? `Error típico: ${info.error_tipico}` : '';
   const names = { pulgar: 'Pulgar', indice: 'Índice', medio: 'Medio', anular: 'Anular', menique: 'Meñique' };
   $('target-shape').replaceChildren(...Object.entries(info.shape).map(([f, how]) => {
@@ -89,9 +115,13 @@ function setVerdict(kind, text) {
 }
 
 function renderVerdict(s) {
-  if (s.verdict === 'ok') setVerdict('ok', '✓ ¡Seña correcta!');
+  if (s.camera_live === false) setVerdict('bad', 'Sin imagen de la cámara: revisa la conexión');
+  else if (s.verdict === 'ok') setVerdict('ok', '✓ ¡Seña correcta!');
   else if (s.verdict === 'fix') setVerdict('bad', `✗ Corrige: ${s.failed_parameters.join(' y ').toLowerCase()}`);
-  else if (s.verdict === 'uncalibrated') setVerdict('wait', `La seña ${s.target} aún no está calibrada`);
+  else if (s.verdict === 'uncalibrated') {
+    const dyn = catalog.find((c) => c.sign === s.target)?.dynamic;
+    setVerdict('wait', dyn ? `La ${s.target} lleva movimiento: pronto se evaluará` : `La seña ${s.target} aún no está calibrada`);
+  }
   else setVerdict('wait', 'Muestra tu mano derecha a la cámara');
 }
 
@@ -110,7 +140,9 @@ function renderIssues(s) {
       return el;
     });
   } else if (s.verdict === 'uncalibrated') {
-    items = [li('wait', 'Graba muestras de esta seña en Calibración')];
+    const dyn = catalog.find((c) => c.sign === s.target)?.dynamic;
+    items = [li('wait', dyn ? 'Mira la animación de referencia para practicarla'
+      : 'Graba muestras de esta seña en Calibración')];
   } else {
     items = [li('wait', 'No veo tu mano')];
   }
@@ -154,9 +186,10 @@ function renderShape(s) {
   const el = $('shape');
   el.hidden = !s.shape;
   if (!s.shape) return;
-  const pctTarget = Math.round(s.shape.target * 100);
-  el.className = `shape-line ${s.shape.best === s.target && s.shape.target >= 0.5 ? '' : 'bad'}`;
-  el.innerHTML = `Forma reconocida: <b>${s.shape.best}</b> · parecido con la ${s.target}: <b>${pctTarget}%</b>`;
+  const wrong = s.shape.best !== s.target || s.shape.error >= 0.5;
+  el.className = `shape-line ${wrong ? 'bad' : ''}`;
+  const err = s.shape.error >= 0.2 ? ` · posible error típico: <b>${Math.round(s.shape.error * 100)}%</b>` : '';
+  el.innerHTML = `Forma reconocida: <b>${s.shape.best}</b>${err}`;
 }
 
 function renderFingers(fingers) {
@@ -189,7 +222,8 @@ function renderStatus(s) {
   else setPill('st-imu', 'bad', 'Buscando muñequera…');
 
   const hand = s.handedness === 'Right' ? ' · mano derecha' : s.handedness === 'Left' ? ' · mano izquierda' : '';
-  setPill('st-cam', s.fps >= 12 ? 'ok' : 'wait', `Cámara ${Math.round(s.fps)} fps${hand}`);
+  if (s.camera_live === false) setPill('st-cam', 'bad', 'Cámara sin imagen');
+  else setPill('st-cam', s.fps >= 12 ? 'ok' : 'wait', `Cámara ${Math.round(s.fps)} fps${hand}`);
 
   const sync = s.sync || {};
   if (!sync.cloud) setPill('st-cloud', 'wait', 'Nube: sin configurar');
@@ -252,12 +286,16 @@ $('person').onchange = (e) => send({ type: 'person', name: e.target.value });
 $('rec-ok').onclick = () => send({ type: 'record', is_error: false });
 $('rec-err').onclick = () => send({ type: 'record', is_error: true });
 $('reload').onclick = async () => { send({ type: 'reload' }); setTimeout(loadCatalog, 300); };
+document.querySelectorAll('#groups button').forEach((b) => {
+  b.onclick = () => { setGroup(b.dataset.group); b.blur(); };
+});
 
 document.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT') return;
-  const n = Number(e.key);
-  if (n >= 1 && n <= catalog.length) chooseSign(catalog[n - 1].sign);
-  else if (e.code === 'Space') { e.preventDefault(); speak(); }
+  if (e.code === 'Space') { e.preventDefault(); speak(); return; }
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const key = e.key.toUpperCase();
+  if (catalog.some((c) => c.sign === key)) chooseSign(key);  // la tecla de la letra la elige
 });
 
 loadCatalog().then(connect);

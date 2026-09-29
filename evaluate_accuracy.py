@@ -22,12 +22,15 @@ import json
 import os
 import sys
 
-from evaluation import evaluate
-from tolerance_calculator import (DATA_DIR, ERRORS_DIR, FINGER_JOINTS, OUTPUT_FILE)
+from evaluation import evaluate, shape_issue
+from tolerance_calculator import (DATA_DIR, ERRORS_DIR, FINGER_JOINTS, LANDMARK_COLUMNS,
+                                  OUTPUT_FILE)
+
+MODEL_FILE = "model.joblib"
 
 
 def load_rows(path):
-    """[(persona, {dedo: ángulo}, {roll,pitch,yaw} o None)] de un CSV."""
+    """[(persona, {dedo: ángulo}, {roll,pitch,yaw} o None, landmarks o None)] de un CSV."""
     rows = []
     with open(path, newline="", encoding="utf-8") as f:
         for r in csv.DictReader(f):
@@ -35,7 +38,9 @@ def load_rows(path):
             imu = None
             if all(r.get(f"imu_{a}") not in (None, "") for a in ("roll", "pitch", "yaw")):
                 imu = {a: float(r[f"imu_{a}"]) for a in ("roll", "pitch", "yaw")}
-            rows.append((r.get("person", ""), angles, imu))
+            feats = ([float(r[c]) for c in LANDMARK_COLUMNS]
+                     if all(r.get(c) for c in LANDMARK_COLUMNS) else None)
+            rows.append((r.get("person", ""), angles, imu, feats))
     return rows
 
 
@@ -43,8 +48,27 @@ def sign_of(path):
     return os.path.splitext(os.path.basename(path))[0]
 
 
-def accepted(rows, tol, require_imu):
-    return sum(evaluate(a, imu, tol, require_imu).ok for _, a, imu in rows)
+class Judge:
+    """Decide como la app: reglas (dedos + muñeca) y, si hay modelo, el clasificador."""
+
+    def __init__(self, model, require_imu):
+        self.model, self.require_imu = model, require_imu
+        self._proba = {}
+
+    def probs(self, feats):
+        key = tuple(feats)
+        if key not in self._proba:
+            p = self.model.predict_proba([feats])[0]
+            self._proba[key] = dict(zip(map(str, self.model.classes_), p))
+        return self._proba[key]
+
+    def passes(self, row, sign, tol):
+        _, angles, imu, feats = row
+        if not evaluate(angles, imu, tol, self.require_imu).ok:
+            return False
+        if self.model is None or feats is None or sign not in map(str, self.model.classes_):
+            return True
+        return shape_issue(self.probs(feats), sign) is None
 
 
 def main():
@@ -52,6 +76,8 @@ def main():
     ap.add_argument("--signs", nargs="*", help="señas a evaluar (default: todas las calibradas)")
     ap.add_argument("--sin-imu", action="store_true",
                     help="ignora la orientación aunque la seña la tenga calibrada")
+    ap.add_argument("--sin-clasificador", action="store_true",
+                    help=f"solo reglas por dedo, sin {MODEL_FILE}")
     args = ap.parse_args()
 
     try:
@@ -60,42 +86,60 @@ def main():
     except FileNotFoundError:
         sys.exit(f"No existe {OUTPUT_FILE}. Corre primero: python tolerance_calculator.py analyze --sign A")
 
+    model = None
+    if not args.sin_clasificador and os.path.exists(MODEL_FILE):
+        import joblib
+        model = joblib.load(MODEL_FILE)
+    judge = Judge(model, require_imu=not args.sin_imu)
+    print("Evaluando como la app: reglas por dedo" + (" + clasificador" if model else "")
+          + ("" if args.sin_imu else " + orientación (si está calibrada)") + "\n")
+
     correct = {sign_of(p): load_rows(p) for p in sorted(glob.glob(f"{DATA_DIR}/*.csv"))}
     errors = {sign_of(p): load_rows(p) for p in sorted(glob.glob(f"{ERRORS_DIR}/*.csv"))}
     signs = args.signs or [s for s in tolerances if s in correct]
 
-    print(f"{'seña':5s} {'correctas':>10s} {'errores':>10s} {'otras letras':>13s}   exactitud")
-    tot_pos = tot_neg = ok_pos = ok_neg = 0
+    def pct(a, b):
+        return f"{100 * a / b:.0f}% ({a}/{b})" if b else "—"
+
+    print(f"{'seña':5s} {'acepta correctas':>17s} {'rechaza errores':>16s} {'rechaza otras letras':>21s}")
+    tot = {"pos": [0, 0], "err": [0, 0], "oth": [0, 0]}
+    per_person = {}
     for sign in signs:
         tol = tolerances[sign]
         pos = correct.get(sign, [])
         err = errors.get(sign, [])
         others = [row for s, rows in correct.items() if s != sign for row in rows]
-        require = not args.sin_imu
+        a_pos = sum(judge.passes(r, sign, tol) for r in pos)
+        r_err = sum(not judge.passes(r, sign, tol) for r in err)
+        r_oth = sum(not judge.passes(r, sign, tol) for r in others)
+        for key, x, n in (("pos", a_pos, len(pos)), ("err", r_err, len(err)), ("oth", r_oth, len(others))):
+            tot[key][0] += x
+            tot[key][1] += n
+        for r in pos:
+            per_person.setdefault(sign, {}).setdefault(r[0], [0, 0])
+            per_person[sign][r[0]][0] += judge.passes(r, sign, tol)
+            per_person[sign][r[0]][1] += 1
+        print(f"{sign:5s} {pct(a_pos, len(pos)):>17s} {pct(r_err, len(err)):>16s} "
+              f"{pct(r_oth, len(others)):>21s}")
 
-        a_pos = accepted(pos, tol, require)
-        r_err = len(err) - accepted(err, tol, require)
-        r_oth = len(others) - accepted(others, tol, require)
-        n_neg = len(err) + len(others)
-        ok_pos += a_pos
-        tot_pos += len(pos)
-        ok_neg += r_err + r_oth
-        tot_neg += n_neg
-
-        def pct(a, b):
-            return f"{100 * a / b:.0f}% ({a}/{b})" if b else "—"
-        exact = (a_pos + r_err + r_oth) / (len(pos) + n_neg) if (pos or n_neg) else 0
-        print(f"{sign:5s} {pct(a_pos, len(pos)):>10s} {pct(r_err, len(err)):>10s} "
-              f"{pct(r_oth, len(others)):>13s}   {100 * exact:.0f}%")
-
-    if tot_pos and tot_neg:
-        tpr, tnr = ok_pos / tot_pos, ok_neg / tot_neg
-        print(f"\nGeneral: aceptó {100 * tpr:.0f}% de las correctas y rechazó "
-              f"{100 * tnr:.0f}% de las incorrectas.")
-        print(f"Exactitud balanceada: {100 * (tpr + tnr) / 2:.0f}%  (meta de la rúbrica: >= 90%)")
+    (ap_, np_), (re_, ne_), (ro_, no_) = tot["pos"], tot["err"], tot["oth"]
+    if np_:
+        print(f"\nAcepta correctas: {100 * ap_ / np_:.0f}%   "
+              + (f"Rechaza errores intencionales: {100 * re_ / ne_:.0f}%   " if ne_ else "")
+              + (f"Rechaza otras letras: {100 * ro_ / no_:.0f}%" if no_ else ""))
+        if ne_:
+            print(f"Aciertos correctas vs. errores (lo que prueba el jurado, meta >= 90%): "
+                  f"{100 * (ap_ + re_) / (np_ + ne_):.0f}%")
+    many = {s: d for s, d in per_person.items() if len(d) > 1}
+    if many:
+        print("\nCorrectas aceptadas por persona:")
+        for sign, d in many.items():
+            print(f"  {sign}: " + "  ".join(f"{p} {a}/{n}" for p, (a, n) in sorted(d.items())))
     if not errors:
-        print("\nNota: no hay muestras en samples_errors/. Grábalas con "
-              "'record --errores' para medir errores intencionales (dedo mal flexionado, etc.).")
+        print("\nNota: no hay muestras en samples_errors/. Grábalas con 'Guardar error intencional' "
+              "para medir errores (dedo mal flexionado, etc.).")
+    print("\nOjo: si los rangos o el clasificador se calcularon con estas mismas muestras correctas,"
+          " su % de aceptación sale optimista; el de errores no.")
 
 
 if __name__ == "__main__":

@@ -9,8 +9,13 @@ No depende de cámara ni de hardware, así que se puede probar y medir sin ellos
 """
 from dataclasses import dataclass, field
 
+from signs import SIGNS
+
 CONFIG = "Configuración"
 ORIENT = "Orientación"
+
+ERROR_SUFFIX = "_mal"   # clase del clasificador con los errores típicos de una seña ("B_mal")
+ERROR_MAX_PROB = 0.5    # si la clase de error de la seña supera esto, se considera mal hecha
 
 FINGER_LABEL = {"pulgar": "pulgar", "indice": "índice", "medio": "medio",
                 "anular": "anular", "menique": "meñique"}
@@ -87,3 +92,22 @@ def evaluate(angles, imu, tol, require_imu=True):
     if orient:
         _orientation_issues(imu, orient, require_imu, result)
     return result
+
+
+def shape_issue(probs, target, max_error=ERROR_MAX_PROB):
+    """probs: {clase: probabilidad} del clasificador (las clases "<SEÑA>_mal" son errores
+    típicos). La forma está bien si `target` es la letra más probable y su clase de error
+    no pasa de `max_error`. No se exige una probabilidad mínima para la letra: con muchas
+    letras parecidas (A, S, T, E) la probabilidad se reparte aunque la seña esté bien.
+    Devuelve un Issue, o None si está bien o si el modelo no conoce la seña."""
+    if target not in probs:
+        return None
+    if probs.get(target + ERROR_SUFFIX, 0.0) >= max_error:
+        typical = SIGNS.get(target, {}).get("error_tipico", "").rstrip(".").lower()
+        action = f"Revisa la {target}: {typical}" if typical else f"Revisa la forma de la {target}"
+        return Issue(CONFIG, "forma", action)
+    letters = {k: v for k, v in probs.items() if not k.endswith(ERROR_SUFFIX)}
+    best = max(letters, key=letters.get)
+    if best != target:
+        return Issue(CONFIG, "forma", f"Ajusta la forma: se parece más a una {best}")
+    return None

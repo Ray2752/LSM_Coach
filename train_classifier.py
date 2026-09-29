@@ -11,6 +11,7 @@ Uso:
     pip install scikit-learn joblib
     python train_classifier.py
     python train_classifier.py --publicos          # suma el dataset público (samples_public/)
+    python train_classifier.py --publicos --errores   # + clases de error ("B_mal", ...)
     python train_classifier.py --salida model.joblib --min-muestras 10
 """
 import argparse
@@ -20,23 +21,28 @@ import os
 import sys
 from collections import Counter
 
-from tolerance_calculator import DATA_DIR, LANDMARK_COLUMNS, rotate_upright
+from tolerance_calculator import DATA_DIR, ERRORS_DIR, LANDMARK_COLUMNS, rotate_upright
 
 MODEL_FILE = "model.joblib"
+ERROR_SUFFIX = "_mal"  # clase de error intencional: "B_mal" = una B con un error típico
 
 
 def make_model():
     """Endereza la mano (rotate_upright) y clasifica con un bosque aleatorio. Es un
-    Pipeline: quien lo cargue le pasa los 63 landmarks tal cual y él los endereza."""
+    Pipeline: quien lo cargue le pasa los 63 landmarks tal cual y él los endereza.
+    100 árboles con hojas de >= 3 muestras: igual de preciso que 300 árboles sin límite,
+    pero ~8 MB y ~2 ms por fotograma (el de 300 pesaba 338 MB y tardaba 40 ms)."""
     from sklearn.ensemble import RandomForestClassifier
     from sklearn.pipeline import make_pipeline
     from sklearn.preprocessing import FunctionTransformer
     return make_pipeline(FunctionTransformer(rotate_upright),
-                         RandomForestClassifier(n_estimators=300, random_state=0, n_jobs=-1))
+                         RandomForestClassifier(n_estimators=100, min_samples_leaf=3,
+                                                random_state=0, n_jobs=-1))
 
 
-def load_samples(dirs=(DATA_DIR,), signs=None):
-    """Devuelve (X, y, personas) solo con las filas que traen landmarks."""
+def load_samples(dirs=(DATA_DIR,), signs=None, suffix=""):
+    """Devuelve (X, y, personas) solo con las filas que traen landmarks. `suffix` se
+    añade a la etiqueta (para las clases de error)."""
     X, y, persons = [], [], []
     skipped = Counter()
     paths = [p for d in dirs for p in sorted(glob.glob(os.path.join(d, "*.csv")))]
@@ -50,7 +56,7 @@ def load_samples(dirs=(DATA_DIR,), signs=None):
                     skipped[sign] += 1
                     continue
                 X.append([float(row[c]) for c in LANDMARK_COLUMNS])
-                y.append(sign)
+                y.append(sign + suffix)
                 persons.append(row.get("person", ""))
     return X, y, persons, skipped
 
@@ -81,6 +87,11 @@ def main():
     ap.add_argument("--publicos", action="store_true",
                     help="incluye el dataset público importado con import_msl.py (samples_public/)")
     ap.add_argument("--signs", nargs="+", help="solo estas señas (default: todas)")
+    ap.add_argument("--sin-validar", action="store_true",
+                    help="no calcula la precisión dejando una persona fuera (es lo más lento)")
+    ap.add_argument("--errores", action="store_true",
+                    help=f"aprende también los errores intencionales de {ERRORS_DIR}/ como clases "
+                         f"'<SEÑA>{ERROR_SUFFIX}': así la app rechaza una seña mal hecha aunque se parezca")
     args = ap.parse_args()
 
     try:
@@ -92,6 +103,9 @@ def main():
     from import_msl import PUBLIC_DIR
     dirs = (DATA_DIR, PUBLIC_DIR) if args.publicos else (DATA_DIR,)
     X, y, persons, skipped = load_samples(dirs, args.signs)
+    if args.errores:
+        Xe, ye, pe, _ = load_samples((ERRORS_DIR,), args.signs, suffix=ERROR_SUFFIX)
+        X, y, persons = X + Xe, y + ye, persons + pe
     if skipped:
         print("Muestras ignoradas por no tener landmarks (formato viejo): "
               + ", ".join(f"{s}={n}" for s, n in sorted(skipped.items())))
@@ -110,8 +124,10 @@ def main():
     for s, n in sorted(Counter(y).items()):
         print(f"  {s}: {n} ({', '.join(sorted({p for l, p in zip(y, persons) if l == s}))})")
 
-    acc, how = evaluate(make_model, X, y, persons)
-    if acc is None:
+    acc, how = (None, None) if args.sin_validar else evaluate(make_model, X, y, persons)
+    if args.sin_validar:
+        print("\n(sin validación: --sin-validar)")
+    elif acc is None:
         print("\nNo hay muestras suficientes para validar el modelo.")
     else:
         print(f"\nPrecisión ({how}): {acc * 100:.0f}%")
@@ -120,7 +136,7 @@ def main():
                   "optimista. Graba con más gente para que generalice.")
 
     model = make_model().fit(list(X), list(y))
-    joblib.dump(model, args.salida)
+    joblib.dump(model, args.salida, compress=3)
     print(f"\nModelo guardado en {args.salida} (señas: {', '.join(model.classes_)})")
 
 
