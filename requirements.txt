@@ -1,3 +1,6 @@
 opencv-python
 mediapipe
+numpy
 bleak
+scikit-learn
+joblib

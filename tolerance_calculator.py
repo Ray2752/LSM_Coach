@@ -230,6 +230,7 @@ def cmd_analyze(args):
         stdev = statistics.stdev(values) if len(values) > 1 else 0.0
         low = mean - margin * stdev if stdev > 0 else mean - 10
         high = mean + margin * stdev if stdev > 0 else mean + 10
+        low, high = max(low, 0.0), min(high, 180.0)  # un ángulo real está en [0°, 180°]
         result[finger] = {"min": round(low, 1), "max": round(high, 1),
                            "promedio": round(mean, 1)}
         print(f"  {finger:10s}  promedio={mean:6.1f}°  rango sugerido=[{low:.1f}°, {high:.1f}°]")
