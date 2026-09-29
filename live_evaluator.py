@@ -1,16 +1,17 @@
 """Evaluador en vivo de LSM Coach.
 
-Usa la MISMA función de ángulos que tolerance_calculator.py y lee tolerances.json.
-Ponlo en la misma carpeta que tolerance_calculator.py e imu_source.py.
+Fusiona cámara (dedos) y muñequera (orientación) para decidir si la seña es correcta
+y decirle al aprendiz QUÉ parámetro corregir. Lee tolerances.json.
 
 Uso:
-    python live_evaluator.py                          # AUTOMÁTICO: detecta la letra solo (necesita model.joblib)
-    python live_evaluator.py --sign A                 # tú eliges la letra; Nano real por BLE
-    python live_evaluator.py --sign A --voz           # ESPACIO = te dice en voz alta qué tienes mal
-    python live_evaluator.py --sign A --imu none      # solo cámara
-    python live_evaluator.py --sign A --imu mock      # IMU simulado (solo pruebas, NO en la demo)
+    python live_evaluator.py                  # seña objetivo A, Nano real por BLE
+    python live_evaluator.py --sign L         # otra seña objetivo
+    python live_evaluator.py --voz            # ESPACIO = te dice en voz alta qué tienes mal
+    python live_evaluator.py --imu none       # solo cámara (pruebas)
+    python live_evaluator.py --auto           # detecta la letra sola (necesita model.joblib)
 
-Teclas: Q salir. Con IMU simulado: a/d roll, w/s pitch, j/l yaw, r reset.
+Teclas: 1-5 cambian la seña objetivo (A B C L Y), Q sale.
+Con --imu mock (solo pruebas, NO en la demo): a/d roll, w/s pitch, j/l yaw, r reset.
 """
 import argparse
 import json
@@ -24,18 +25,19 @@ from collections import deque
 import cv2
 import mediapipe as mp
 
+from evaluation import ORIENT, evaluate
+from imu_source import MockIMU, BLEIMU
+from signs import NIVEL_1, describe
 from tolerance_calculator import (landmarks_to_angles, landmarks_to_features,
                                   FINGER_JOINTS, OUTPUT_FILE)
-from imu_source import MockIMU, BLEIMU
+from ui import TextLayer
 
 SMOOTH_FRAMES = 5
 PERSIST_S = 0.6   # el error debe durar esto para avisar (evita avisos por parpadeos)
 REPEAT_S = 6.0    # si sigues con el MISMO error, se repite hasta pasado este tiempo
 MIN_GAP_S = 1.5   # pausa mínima entre dos avisos cualquiera
 VIBRATE_MS = 250
-SPOKEN_NAMES = {"pulgar": "pulgar", "indice": "índice", "medio": "medio",
-                "anular": "anular", "menique": "meñique"}
-GREEN, RED, YELLOW = (0, 200, 0), (0, 0, 255), (0, 200, 255)
+GREEN, RED, YELLOW, WHITE = (0, 200, 0), (80, 80, 255), (0, 200, 255), (255, 255, 255)
 
 
 # En Windows se usa la voz del sistema (System.Speech) con PowerShell, un proceso
@@ -97,68 +99,29 @@ class Speaker:
             self.proc.kill()
 
 
-def load_tolerances(sign):
+def load_all_tolerances():
     try:
         with open(OUTPUT_FILE, encoding="utf-8") as f:
-            data = json.load(f)
+            return json.load(f)
     except FileNotFoundError:
-        sys.exit(f"No existe {OUTPUT_FILE}. Corre primero: "
-                 f"python tolerance_calculator.py analyze --sign {sign}")
-    if sign not in data:
-        sys.exit(f"'{sign}' no está en {OUTPUT_FILE}. Disponibles: {list(data)}")
-    return data[sign]
+        print(f"Aviso: no existe {OUTPUT_FILE}. Corre: python tolerance_calculator.py analyze --sign A")
+        return {}
 
 
-def load_auto(model_path):
-    """Modo automático: carga el clasificador y todos los rangos calibrados."""
+def load_model(model_path):
+    """Modo automático: carga el clasificador."""
     try:
         import joblib
-        model = joblib.load(model_path)
+        return joblib.load(model_path)
     except FileNotFoundError:
         sys.exit(f"No existe {model_path}. Entrena primero: python train_classifier.py")
-    try:
-        with open(OUTPUT_FILE, encoding="utf-8") as f:
-            all_tol = json.load(f)
-    except FileNotFoundError:
-        all_tol = {}
-    return model, all_tol
-
-
-def evaluate_fingers(angles, tol):
-    """Devuelve {dedo: (ok, mensaje)}."""
-    result = {}
-    for finger, ang in angles.items():
-        lo, hi = tol[finger]["min"], tol[finger]["max"]
-        if ang < lo:
-            result[finger] = (False, f"{finger}: muy cerrado, extiéndelo")
-        elif ang > hi:
-            result[finger] = (False, f"{finger}: muy extendido, flexiónalo")
-        else:
-            result[finger] = (True, f"{finger}: OK")
-    return result
-
-
-def evaluate_orientation(imu_vals, tol):
-    """Opcional: solo si tolerances.json trae 'orientacion' para la seña.
-    Formato: {"orientacion": {"roll": {"min": -20, "max": 20}, "pitch": {...}}}"""
-    orient = tol.get("orientacion") if tol else None
-    if not orient:
-        return []
-    problems = []
-    for axis, rng in orient.items():
-        v = imu_vals.get(axis)
-        if v is None:
-            continue
-        if v < rng["min"]:
-            problems.append(f"{axis}: {v:.0f}° (mín {rng['min']}°)")
-        elif v > rng["max"]:
-            problems.append(f"{axis}: {v:.0f}° (máx {rng['max']}°)")
-    return problems
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--sign", help="letra a evaluar; si no la pones, la detecta sola")
+    ap.add_argument("--sign", default=NIVEL_1[0], help="seña objetivo (default A)")
+    ap.add_argument("--auto", action="store_true",
+                    help="detecta la letra sola con model.joblib en vez de una seña objetivo")
     ap.add_argument("--modelo", default="model.joblib")
     ap.add_argument("--umbral", type=float, default=0.6,
                     help="confianza mínima para dar por buena la letra detectada")
@@ -167,20 +130,18 @@ def main():
     ap.add_argument("--voz", action="store_true", help="ESPACIO: dice en voz alta qué tienes mal")
     args = ap.parse_args()
 
-    auto = args.sign is None
+    all_tol = load_all_tolerances()
+    auto = args.auto
+    target = args.sign
     if auto:
-        model, all_tol = load_auto(args.modelo)
+        model = load_model(args.modelo)
         detect_hist = deque(maxlen=7)  # voto de los últimos fotogramas: evita parpadeos
-        tol = None
-    else:
-        tol = load_tolerances(args.sign)
     imu = {"mock": MockIMU, "ble": BLEIMU}.get(args.imu, lambda: None)()
     if imu:
         imu.start()
     speaker = Speaker() if args.voz else None
     last_alert_t, last_alert_key = 0.0, None
     cur_key, cur_since = None, 0.0
-    state = {"key": None}  # error actual (lo lee el hilo de voz)
 
     history = {f: deque(maxlen=SMOOTH_FRAMES) for f in FINGER_JOINTS}
     mp_hands, mp_draw = mp.solutions.hands, mp.solutions.drawing_utils
@@ -197,13 +158,23 @@ def main():
             frame = cv2.flip(frame, 1)  # igual que al grabar
             h, w = frame.shape[:2]
             res = hands.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            layer = TextLayer()
 
-            all_ok, y, problems = False, 30, []
-            cur_sign, det_conf = args.sign, 0.0
+            # Lectura de la muñequera (None si no hay conexión: nunca ceros falsos)
+            linked = imu is not None and getattr(imu, "connected", True)
+            imu_vals = dict(imu.latest) if linked else None
+
+            cur_sign = None if auto else target
+            tol, evaluation, y = None, None, 8
             if auto:
-                tol, cur_sign = None, None
                 if not res.multi_hand_landmarks:
                     detect_hist.clear()
+            else:
+                layer.add(f"Seña objetivo: {target}", (10, y), WHITE, 26)
+                y += 32
+                layer.add(describe(target), (10, y), YELLOW, 17)
+                y += 24
+
             if res.multi_hand_landmarks:
                 lm = res.multi_hand_landmarks[0]
                 mp_draw.draw_landmarks(frame, lm, mp_hands.HAND_CONNECTIONS)
@@ -222,51 +193,43 @@ def main():
                     det_conf = sum(c for l, c in detect_hist if l == top) / labels.count(top)
                     if det_conf >= args.umbral:
                         cur_sign = top
-                        tol = all_tol.get(top)
                     txt = (f"Detecté: {top} ({det_conf * 100:.0f}%)" if cur_sign
                            else "Detectando...")
-                    cv2.putText(frame, txt, (10, y), cv2.FONT_HERSHEY_SIMPLEX,
-                                0.8, GREEN if cur_sign else YELLOW, 2)
-                    y += 32
+                    layer.add(txt, (10, y), GREEN if cur_sign else YELLOW, 24)
+                    y += 30
 
+                tol = all_tol.get(cur_sign) if cur_sign else None
                 if tol:
-                    fingers = evaluate_fingers(angles, tol)
-                    all_ok = all(ok_ for ok_, _ in fingers.values())
-
-                    for finger, (ok_, msg) in fingers.items():
-                        cv2.putText(frame, msg, (10, y), cv2.FONT_HERSHEY_SIMPLEX,
-                                    0.6, GREEN if ok_ else RED, 2)
-                        y += 25
-                        if not ok_:  # marca la punta del dedo que falla
-                            verb = "Extiende" if angles[finger] < tol[finger]["min"] else "Flexiona"
-                            problems.append(f"{verb} el {SPOKEN_NAMES[finger]}")
-                            tip = lm.landmark[FINGER_JOINTS[finger][2]]
+                    # FUSIÓN: dedos (cámara) + orientación de la muñeca (IMU)
+                    evaluation = evaluate(angles, imu_vals, tol, require_imu=imu is not None)
+                    for finger, (ok_, msg) in evaluation.fingers.items():
+                        layer.add(msg, (10, y), GREEN if ok_ else RED, 17)
+                        y += 22
+                    for issue in evaluation.issues:
+                        if issue.parameter == ORIENT:
+                            layer.add(f"Orientación: {issue.action}", (10, y), RED, 17)
+                            y += 22
+                        elif issue.where in FINGER_JOINTS:  # marca la punta del dedo que falla
+                            tip = lm.landmark[FINGER_JOINTS[issue.where][2]]
                             cv2.circle(frame, (int(tip.x * w), int(tip.y * h)), 14, RED, 3)
+                    if evaluation.issues:
+                        layer.add("Corrige: " + ", ".join(evaluation.failed_parameters),
+                                  (10, y + 4), RED, 20)
             else:
-                cv2.putText(frame, "No se detecta la mano", (10, y),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, YELLOW, 2)
+                layer.add("No se detecta la mano", (10, y), YELLOW, 20)
 
             if imu:
-                v = imu.latest
-                linked = getattr(imu, "connected", True)  # MockIMU no tiene .connected
                 if linked:
-                    cv2.putText(frame,
-                                f"IMU roll={v['roll']:.0f} pitch={v['pitch']:.0f} yaw={v['yaw']:.0f}",
-                                (10, h - 40), cv2.FONT_HERSHEY_SIMPLEX, 0.55, YELLOW, 2)
+                    v = imu_vals
+                    layer.add(f"Muñequera: roll={v['roll']:.0f}  pitch={v['pitch']:.0f}  "
+                              f"yaw={v['yaw']:.0f}", (10, h - 62), YELLOW, 16)
                 else:  # sin conexión no se evalúa la muñeca con ceros falsos
-                    cv2.putText(frame, "IMU: buscando LSM-Wrist...", (10, h - 40),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.55, RED, 2)
-                for p in (evaluate_orientation(v, tol) if linked else []):
-                    all_ok = False
-                    problems.append("Corrige la muñeca")
-                    cv2.putText(frame, "Muñeca -> " + p, (10, y),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, RED, 2)
-                    y += 25
+                    layer.add("Muñequera: buscando LSM-Wrist...", (10, h - 62), RED, 16)
 
             # Vibración automática: solo si el error persiste, sin repetir de más
+            problems = [i.action for i in evaluation.issues] if evaluation else []
             now = time.time()
             key = problems[0] if problems else None
-            state["key"] = key
             if key != cur_key:
                 cur_key, cur_since = key, now
             if (key and now - cur_since >= PERSIST_S
@@ -282,28 +245,34 @@ def main():
                 label, color = "Haz una seña...", YELLOW
             elif tol is None:
                 label, color = f"'{cur_sign}' (sin rangos calibrados)", YELLOW
+            elif evaluation is None:
+                label, color = f"Seña '{cur_sign}': muestra tu mano", YELLOW
             else:
-                label = f"Seña '{cur_sign}': " + ("CORRECTA" if all_ok else "corrige")
-                color = GREEN if all_ok else RED
-            cv2.putText(frame, label, (10, h - 12), cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
-            if speaker:
-                cv2.putText(frame, "ESPACIO: que tengo mal?", (w - 260, h - 12),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, YELLOW, 1)
-            cv2.imshow("LSM Coach - evaluador", frame)
+                label = f"Seña '{cur_sign}': " + ("CORRECTA" if evaluation.ok else "corrige")
+                color = GREEN if evaluation.ok else RED
+            layer.add(label, (10, h - 34), color, 26)
+            hints = ("1-5: cambiar seña" + ("   ESPACIO: ¿qué tengo mal?" if speaker else "")
+                     if not auto else "")
+            if hints:
+                layer.add(hints, (w - 270, h - 26), YELLOW, 14)
+            cv2.imshow("LSM Coach - evaluador", layer.draw(frame))
 
-            key = cv2.waitKey(1) & 0xFF
-            if key == ord("q"):
+            k = cv2.waitKey(1) & 0xFF
+            if k == ord("q"):
                 break
-            if key == ord(" ") and speaker:
+            if not auto and ord("1") <= k <= ord(str(len(NIVEL_1))):
+                target = NIVEL_1[k - ord("1")]
+                cur_key, last_alert_key = None, None
+            if k == ord(" ") and speaker:
                 if not res.multi_hand_landmarks:
                     text = "No veo tu mano"
                 elif problems:
                     text = ". ".join(list(dict.fromkeys(problems))[:3])
                 else:
                     text = "Todo bien"
-                speaker.say(text, lambda: True)
-            if isinstance(imu, MockIMU) and key != 255:
-                imu.handle_key(chr(key))
+                speaker.say(text)
+            if isinstance(imu, MockIMU) and k != 255:
+                imu.handle_key(chr(k))
 
     cap.release()
     cv2.destroyAllWindows()

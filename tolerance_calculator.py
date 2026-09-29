@@ -55,7 +55,13 @@ import sys
 from datetime import datetime
 
 DATA_DIR = "samples"
+ERRORS_DIR = "samples_errors"  # ejecuciones INCORRECTAS a propósito (para medir aciertos)
 OUTPUT_FILE = "tolerances.json"
+
+# Lecturas de la muñequera al capturar (vacías si no había IMU conectada)
+IMU_COLUMNS = ["imu_roll", "imu_pitch", "imu_yaw"]
+MIN_IMU_SAMPLES = 5
+ORIENT_AXES = ("roll", "pitch")  # el yaw no se usa: sin magnetómetro solo es relativo
 
 # Índices de landmarks de MediaPipe Hands para cada dedo:
 # (base del dedo / MCP, articulación media / PIP, punta / TIP)
@@ -109,7 +115,8 @@ def landmarks_to_features(landmarks):
 
 
 def csv_header():
-    return ["timestamp", "person", "sign"] + list(FINGER_JOINTS.keys()) + LANDMARK_COLUMNS
+    return (["timestamp", "person", "sign"] + list(FINGER_JOINTS.keys())
+            + LANDMARK_COLUMNS + IMU_COLUMNS)
 
 
 def migrate_csv_if_needed(csv_path, header):
@@ -136,12 +143,21 @@ def migrate_csv_if_needed(csv_path, header):
 def cmd_record(args):
     import cv2
     import mediapipe as mp
+    from ui import TextLayer
 
-    os.makedirs(DATA_DIR, exist_ok=True)
-    csv_path = os.path.join(DATA_DIR, f"{args.sign}.csv")
+    green, yellow, red = (0, 255, 0), (0, 200, 255), (0, 0, 255)
+    data_dir = ERRORS_DIR if args.errores else DATA_DIR
+    os.makedirs(data_dir, exist_ok=True)
+    csv_path = os.path.join(data_dir, f"{args.sign}.csv")
     header = csv_header()
     migrate_csv_if_needed(csv_path, header)
     is_new = not os.path.exists(csv_path)
+
+    imu = None
+    if args.imu == "ble":
+        from imu_source import BLEIMU
+        imu = BLEIMU()
+        imu.start()
 
     mp_hands = mp.solutions.hands
     mp_draw = mp.solutions.drawing_utils
@@ -151,8 +167,11 @@ def cmd_record(args):
         print("No se pudo abrir la cámara.")
         sys.exit(1)
 
-    print(f"Grabando muestras de '{args.sign}' para '{args.person}'.")
+    kind = "ERRORES intencionales" if args.errores else "ejecuciones correctas"
+    print(f"Grabando {kind} de '{args.sign}' para '{args.person}' en {csv_path}.")
     print("Mantén la seña fija y presiona ESPACIO para capturar. Q para salir.")
+    if imu:
+        print("Esperando la muñequera 'LSM-Wrist' (usa --imu none para grabar solo con cámara)...")
 
     count = 0
     with mp_hands.Hands(max_num_hands=1, min_detection_confidence=0.6) as hands, \
@@ -169,6 +188,7 @@ def cmd_record(args):
             frame = cv2.flip(frame, 1)
             rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             result = hands.process(rgb)
+            layer = TextLayer()
 
             angles = None
             features = None
@@ -177,20 +197,31 @@ def cmd_record(args):
                 mp_draw.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
                 angles = landmarks_to_angles(hand_landmarks.landmark)
                 features = landmarks_to_features(hand_landmarks.landmark)
-                text_y = 30
-                for finger, ang in angles.items():
-                    cv2.putText(frame, f"{finger}: {ang:.1f}", (10, text_y),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-                    text_y += 25
+                for i, (finger, ang) in enumerate(angles.items()):
+                    layer.add(f"{finger}: {ang:.1f}", (10, 8 + 24 * i), green, 18)
 
-            cv2.putText(frame, f"Muestras capturadas: {count}", (10, frame.shape[0] - 15),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 200, 255), 2)
-            cv2.imshow("Grabar seña - ESPACIO para capturar, Q para salir", frame)
+            imu_vals = dict(imu.latest) if imu and imu.connected else None
+            h = frame.shape[0]
+            if imu:
+                if imu_vals:
+                    layer.add(f"IMU roll={imu_vals['roll']:.0f} pitch={imu_vals['pitch']:.0f} "
+                              f"yaw={imu_vals['yaw']:.0f}", (10, h - 62), yellow, 18)
+                else:
+                    layer.add("IMU: buscando LSM-Wrist...", (10, h - 62), red, 18)
+            layer.add(f"{kind}: {args.sign} — muestras capturadas: {count}",
+                      (10, h - 32), yellow, 18)
+            frame = layer.draw(frame)
+            cv2.imshow("Grabar sena - ESPACIO para capturar, Q para salir", frame)
 
             key = cv2.waitKey(1) & 0xFF
             if key == ord(" ") and angles is not None:
+                if imu and imu_vals is None:
+                    print("  (sin captura: la muñequera aún no está conectada)")
+                    continue
+                imu_row = ([imu_vals["roll"], imu_vals["pitch"], imu_vals["yaw"]]
+                           if imu_vals else [""] * len(IMU_COLUMNS))
                 row = [datetime.now().isoformat(), args.person, args.sign] + \
-                      [angles[fn] for fn in FINGER_JOINTS.keys()] + features
+                      [angles[fn] for fn in FINGER_JOINTS.keys()] + features + imu_row
                 writer.writerow(row)
                 f.flush()
                 count += 1
@@ -200,7 +231,22 @@ def cmd_record(args):
 
     cap.release()
     cv2.destroyAllWindows()
+    if imu:
+        imu.stop()
     print(f"\nListo. {count} muestras guardadas en {csv_path}")
+
+
+def _range(values, margin, floor, lo_limit=None, hi_limit=None):
+    """Rango = promedio +/- max(margen * desviación, holgura mínima)."""
+    mean = statistics.mean(values)
+    stdev = statistics.stdev(values) if len(values) > 1 else 0.0
+    half = max(margin * stdev, floor)
+    low, high = mean - half, mean + half
+    if lo_limit is not None:
+        low = max(low, lo_limit)
+    if hi_limit is not None:
+        high = min(high, hi_limit)
+    return {"min": round(low, 1), "max": round(high, 1), "promedio": round(mean, 1)}
 
 
 def cmd_analyze(args):
@@ -210,6 +256,7 @@ def cmd_analyze(args):
         sys.exit(1)
 
     per_finger = {f: [] for f in FINGER_JOINTS.keys()}
+    per_axis = {a: [] for a in ORIENT_AXES}
     with open(csv_path, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         n = 0
@@ -217,23 +264,34 @@ def cmd_analyze(args):
             n += 1
             for finger in FINGER_JOINTS.keys():
                 per_finger[finger].append(float(row[finger]))
+            for axis in ORIENT_AXES:
+                v = row.get(f"imu_{axis}")
+                if v not in (None, ""):
+                    per_axis[axis].append(float(v))
 
     if n < 5:
         print(f"Aviso: solo hay {n} muestras. Idealmente graben al menos 15-30 "
               "(varias personas repitiendo la seña) antes de fijar el rango.")
 
-    margin = args.margin
     result = {}
     print(f"\nResultados para '{args.sign}' ({n} muestras):\n")
     for finger, values in per_finger.items():
-        mean = statistics.mean(values)
-        stdev = statistics.stdev(values) if len(values) > 1 else 0.0
-        low = mean - margin * stdev if stdev > 0 else mean - 10
-        high = mean + margin * stdev if stdev > 0 else mean + 10
-        low, high = max(low, 0.0), min(high, 180.0)  # un ángulo real está en [0°, 180°]
-        result[finger] = {"min": round(low, 1), "max": round(high, 1),
-                           "promedio": round(mean, 1)}
-        print(f"  {finger:10s}  promedio={mean:6.1f}°  rango sugerido=[{low:.1f}°, {high:.1f}°]")
+        # un ángulo real está en [0°, 180°]
+        result[finger] = _range(values, args.margin, args.holgura_min, 0.0, 180.0)
+        r = result[finger]
+        print(f"  {finger:10s}  promedio={r['promedio']:6.1f}°  "
+              f"rango sugerido=[{r['min']:.1f}°, {r['max']:.1f}°]")
+
+    if all(len(v) >= MIN_IMU_SAMPLES for v in per_axis.values()):
+        result["orientacion"] = {axis: _range(vals, args.margin, args.holgura_orient)
+                                 for axis, vals in per_axis.items()}
+        print("\n  Orientación de la muñeca (IMU):")
+        for axis, r in result["orientacion"].items():
+            print(f"  {axis:10s}  promedio={r['promedio']:6.1f}°  "
+                  f"rango sugerido=[{r['min']:.1f}°, {r['max']:.1f}°]")
+    else:
+        print(f"\nAviso: menos de {MIN_IMU_SAMPLES} muestras con IMU; esta seña quedará "
+              "SIN orientación (solo configuración de dedos). Regraba con la muñequera puesta.")
 
     # Guardar/actualizar tolerances.json
     all_tolerances = {}
@@ -252,14 +310,23 @@ def main():
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_record = sub.add_parser("record", help="Grabar muestras de una seña con la cámara")
-    p_record.add_argument("--sign", required=True, help="Nombre de la seña, ej: hola")
+    p_record.add_argument("--sign", required=True, help="Nombre de la seña, ej: A")
     p_record.add_argument("--person", required=True, help="Quién está grabando la muestra")
+    p_record.add_argument("--imu", choices=["ble", "none"], default="ble",
+                          help="ble = guarda también la orientación de la muñequera (default)")
+    p_record.add_argument("--errores", action="store_true",
+                          help=f"guarda ejecuciones INCORRECTAS a propósito en {ERRORS_DIR}/ "
+                               "(sirven para medir aciertos con evaluate_accuracy.py)")
     p_record.set_defaults(func=cmd_record)
 
     p_analyze = sub.add_parser("analyze", help="Calcular rango de tolerancia de una seña")
     p_analyze.add_argument("--sign", required=True, help="Nombre de la seña a analizar")
     p_analyze.add_argument("--margin", type=float, default=2.0,
                             help="Cuántas desviaciones estándar de margen (default 2.0)")
+    p_analyze.add_argument("--holgura-min", type=float, default=6.0,
+                            help="holgura mínima en grados para los dedos (default 6)")
+    p_analyze.add_argument("--holgura-orient", type=float, default=10.0,
+                            help="holgura mínima en grados para roll/pitch (default 10)")
     p_analyze.set_defaults(func=cmd_analyze)
 
     args = parser.parse_args()
