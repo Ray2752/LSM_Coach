@@ -1,28 +1,3 @@
-/*
-  LSM Coach - muñequera (Arduino Nano 33 BLE Sense Rev2)
-
-  Lee el IMU (BMI270), calcula roll/pitch/yaw con un filtro Madgwick y los manda
-  por BLE a la app (imu_source.py -> BLEIMU). También recibe órdenes de vibración.
-
-  Protocolo (debe coincidir con imu_source.py):
-    Nombre BLE ....... "LSM-Wrist"
-    Orientación ...... 19B10001-E8F2-537E-4F6C-D104768A1214  (notify, 12 bytes = 3 float
-                       little-endian: roll, pitch, yaw en grados)
-    Vibración ........ 19B10002-E8F2-537E-4F6C-D104768A1214  (write, 1 byte = duración en
-                       unidades de 10 ms)
-
-  Librerías (Administrar bibliotecas del IDE):  ArduinoBLE, Arduino_BMI270_BMM150, MadgwickAHRS
-  Placa: "Arduino Mbed OS Nano Boards" -> Arduino Nano 33 BLE
-
-  Motor de vibración: NO lo conectes directo al pin (máx. ~15 mA). Usa un transistor NPN
-  (p. ej. 2N2222) o un driver, con un diodo en antiparalelo sobre el motor, alimentado
-  a 3.3 V o 5 V (el reto exige <= 5 V) y sin cables expuestos.
-
-  Yaw: al usar solo acelerómetro+giroscopio (sin magnetómetro) el yaw es RELATIVO a la
-  posición al encender y deriva lento. Roll y pitch son absolutos (respecto a la gravedad).
-  Si al girar la placa roll y pitch salen intercambiados o con el signo invertido, ajusta
-  AXIS_MAP más abajo (los ejes del BMI270 dependen de cómo montes la placa en la muñeca).
-*/
 #include <ArduinoBLE.h>
 #include <Arduino_BMI270_BMM150.h>
 #include <MadgwickAHRS.h>
@@ -32,7 +7,7 @@ const char *SERVICE_UUID = "19B10000-E8F2-537E-4F6C-D104768A1214";
 const char *ORIENT_UUID = "19B10001-E8F2-537E-4F6C-D104768A1214";
 const char *VIB_UUID = "19B10002-E8F2-537E-4F6C-D104768A1214";
 
-const int VIB_PIN = 2;                 // hacia la base del transistor (con resistencia ~1 kΩ)
+const int VIB_PIN = 3;                 // D3, hacia la base del transistor (con resistencia ~1 kΩ)
 const unsigned long SEND_MS = 50;      // 20 envíos por segundo
 const unsigned long DEBUG_MS = 200;    // salida por serial para depurar (0 = apagada)
 

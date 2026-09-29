@@ -5,7 +5,7 @@
 import unittest
 
 from evaluation import CONFIG, ORIENT, evaluate
-from tolerance_calculator import _range
+from tolerance_calculator import _range, rotate_upright
 
 TOL = {f: {"min": 160.0, "max": 180.0} for f in ("pulgar", "indice", "medio", "anular", "menique")}
 TOL_ORIENT = {**TOL, "orientacion": {"roll": {"min": -10, "max": 10},
@@ -62,6 +62,26 @@ class RangeTests(unittest.TestCase):
     def test_limites_fisicos(self):
         r = _range([5.0, 175.0], margin=2.0, floor=6.0, lo_limit=0.0, hi_limit=180.0)
         self.assertEqual((r["min"], r["max"]), (0.0, 180.0))
+
+
+class RotateUprightTests(unittest.TestCase):
+    def test_endereza_una_mano_inclinada(self):
+        import math
+        hand = [0.0] * 63
+        hand[9 * 3], hand[9 * 3 + 1] = 1.0, 0.0      # base del dedo medio a la derecha
+        hand[8 * 3], hand[8 * 3 + 1] = 2.0, 0.0      # punta del índice, más a la derecha
+        out = rotate_upright([hand])[0]
+        self.assertAlmostEqual(out[9 * 3], 0.0)
+        self.assertAlmostEqual(out[9 * 3 + 1], -1.0)  # ahora apunta hacia arriba (-y)
+        self.assertAlmostEqual(out[8 * 3 + 1], -2.0)
+        self.assertTrue(math.isclose(sum(v * v for v in out), sum(v * v for v in hand)))
+
+    def test_mano_ya_derecha_no_cambia(self):
+        hand = [0.0] * 63
+        hand[9 * 3 + 1], hand[4 * 3] = -1.0, 0.5
+        out = rotate_upright([hand])[0]
+        for a, b in zip(out, hand):
+            self.assertAlmostEqual(a, b)
 
 
 if __name__ == "__main__":

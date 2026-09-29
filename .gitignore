@@ -10,6 +10,7 @@ __pycache__/
 # Secretos
 .env
 .env.*
+!.env.example
 *.pem
 *.key
 
@@ -17,3 +18,10 @@ __pycache__/
 *.bak
 .DS_Store
 .vscode/
+
+# Datos locales (se sincronizan a Supabase)
+lsm_coach.db
+lsm_coach.db-journal
+
+# Datos derivados de datasets públicos (se regeneran con import_msl.py)
+samples_public/

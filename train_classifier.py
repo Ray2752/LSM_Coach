@@ -10,6 +10,7 @@ grabarlas con `python tolerance_calculator.py record --sign X --person Y`.
 Uso:
     pip install scikit-learn joblib
     python train_classifier.py
+    python train_classifier.py --publicos          # suma el dataset público (samples_public/)
     python train_classifier.py --salida model.joblib --min-muestras 10
 """
 import argparse
@@ -19,16 +20,29 @@ import os
 import sys
 from collections import Counter
 
-from tolerance_calculator import DATA_DIR, LANDMARK_COLUMNS
+from tolerance_calculator import DATA_DIR, LANDMARK_COLUMNS, rotate_upright
 
 MODEL_FILE = "model.joblib"
 
 
-def load_samples():
+def make_model():
+    """Endereza la mano (rotate_upright) y clasifica con un bosque aleatorio. Es un
+    Pipeline: quien lo cargue le pasa los 63 landmarks tal cual y él los endereza."""
+    from sklearn.ensemble import RandomForestClassifier
+    from sklearn.pipeline import make_pipeline
+    from sklearn.preprocessing import FunctionTransformer
+    return make_pipeline(FunctionTransformer(rotate_upright),
+                         RandomForestClassifier(n_estimators=300, random_state=0, n_jobs=-1))
+
+
+def load_samples(dirs=(DATA_DIR,), signs=None):
     """Devuelve (X, y, personas) solo con las filas que traen landmarks."""
     X, y, persons = [], [], []
     skipped = Counter()
-    for path in sorted(glob.glob(os.path.join(DATA_DIR, "*.csv"))):
+    paths = [p for d in dirs for p in sorted(glob.glob(os.path.join(d, "*.csv")))]
+    for path in paths:
+        if signs and os.path.splitext(os.path.basename(path))[0] not in signs:
+            continue
         with open(path, newline="", encoding="utf-8") as f:
             for row in csv.DictReader(f):
                 sign = row.get("sign") or os.path.splitext(os.path.basename(path))[0]
@@ -64,15 +78,20 @@ def main():
     ap.add_argument("--salida", default=MODEL_FILE)
     ap.add_argument("--min-muestras", type=int, default=5,
                     help="mínimo de muestras con landmarks por seña para incluirla (default 5)")
+    ap.add_argument("--publicos", action="store_true",
+                    help="incluye el dataset público importado con import_msl.py (samples_public/)")
+    ap.add_argument("--signs", nargs="+", help="solo estas señas (default: todas)")
     args = ap.parse_args()
 
     try:
-        from sklearn.ensemble import RandomForestClassifier
         import joblib
+        import sklearn  # noqa: F401
     except ImportError:
         sys.exit("Faltan dependencias. Instala: pip install scikit-learn joblib")
 
-    X, y, persons, skipped = load_samples()
+    from import_msl import PUBLIC_DIR
+    dirs = (DATA_DIR, PUBLIC_DIR) if args.publicos else (DATA_DIR,)
+    X, y, persons, skipped = load_samples(dirs, args.signs)
     if skipped:
         print("Muestras ignoradas por no tener landmarks (formato viejo): "
               + ", ".join(f"{s}={n}" for s, n in sorted(skipped.items())))
@@ -90,9 +109,6 @@ def main():
     print("\nMuestras usadas:")
     for s, n in sorted(Counter(y).items()):
         print(f"  {s}: {n} ({', '.join(sorted({p for l, p in zip(y, persons) if l == s}))})")
-
-    def make_model():
-        return RandomForestClassifier(n_estimators=300, random_state=0, n_jobs=-1)
 
     acc, how = evaluate(make_model, X, y, persons)
     if acc is None:

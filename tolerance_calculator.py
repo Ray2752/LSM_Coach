@@ -114,6 +114,23 @@ def landmarks_to_features(landmarks):
     return [round(v, 5) for v in feats]
 
 
+def rotate_upright(X):
+    """Gira cada mano en el plano de la imagen para que muñeca -> base del dedo medio
+    apunte hacia arriba. X: filas de 63 números de landmarks_to_features.
+
+    Así el clasificador reconoce la FORMA aunque la mano esté inclinada (con la mano
+    girada 60°, sin esto la C bajaba de 98 % a 23 % de aciertos). La inclinación de
+    la muñeca la evalúa la muñequera, no el clasificador."""
+    import numpy as np
+    P = np.asarray(X, dtype=float).reshape(-1, 21, 3).copy()
+    ang = np.arctan2(P[:, 9, 0], -P[:, 9, 1])  # ángulo respecto a "arriba" (-y en la imagen)
+    c, s = np.cos(ang)[:, None], np.sin(ang)[:, None]
+    x, y = P[:, :, 0].copy(), P[:, :, 1].copy()
+    P[:, :, 0] = c * x + s * y
+    P[:, :, 1] = -s * x + c * y
+    return P.reshape(len(P), -1)
+
+
 def csv_header():
     return (["timestamp", "person", "sign"] + list(FINGER_JOINTS.keys())
             + LANDMARK_COLUMNS + IMU_COLUMNS)
@@ -138,6 +155,26 @@ def migrate_csv_if_needed(csv_path, header):
             writer.writerow([d.get(c, "") for c in header])
     print(f"Se migró {csv_path} al formato nuevo (copia en {csv_path}.bak). "
           f"Las {len(rows) - 1} muestras viejas no tienen landmarks.")
+
+
+def append_sample(sign, person, angles, features, imu_vals, errores=False):
+    """Agrega una muestra al CSV de la seña, con el mismo formato que `record`.
+    Devuelve la ruta del CSV."""
+    data_dir = ERRORS_DIR if errores else DATA_DIR
+    os.makedirs(data_dir, exist_ok=True)
+    csv_path = os.path.join(data_dir, f"{sign}.csv")
+    header = csv_header()
+    migrate_csv_if_needed(csv_path, header)
+    is_new = not os.path.exists(csv_path)
+    imu_row = ([imu_vals["roll"], imu_vals["pitch"], imu_vals["yaw"]]
+               if imu_vals else [""] * len(IMU_COLUMNS))
+    with open(csv_path, "a", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        if is_new:
+            writer.writerow(header)
+        writer.writerow([datetime.now().isoformat(), person, sign]
+                        + [angles[fn] for fn in FINGER_JOINTS.keys()] + features + imu_row)
+    return csv_path
 
 
 def cmd_record(args):
@@ -273,11 +310,32 @@ def cmd_analyze(args):
         print(f"Aviso: solo hay {n} muestras. Idealmente graben al menos 15-30 "
               "(varias personas repitiendo la seña) antes de fijar el rango.")
 
+    all_tolerances = {}
+    if os.path.exists(OUTPUT_FILE):
+        with open(OUTPUT_FILE, encoding="utf-8") as f:
+            all_tolerances = json.load(f)
+    widths = all_tolerances.get(args.sign, {}).get("ancho")
+    centered = widths is not None and not args.solo_propias
+
     result = {}
-    print(f"\nResultados para '{args.sign}' ({n} muestras):\n")
+    if centered:
+        # Centro = la mediana de SUS muestras (su mano, su cámara); ancho = el que midió
+        # evaluate_public.py con 20 personas del dataset público.
+        result["ancho"] = widths
+        method = "centrado en sus muestras, con el ancho del dataset público"
+    else:
+        method = f"promedio ± {args.margin} desviaciones de sus muestras"
+    result["fuente"] = f"{n} muestras propias; {method}"
+    print(f"\nResultados para '{args.sign}' ({n} muestras, {method}):\n")
     for finger, values in per_finger.items():
-        # un ángulo real está en [0°, 180°]
-        result[finger] = _range(values, args.margin, args.holgura_min, 0.0, 180.0)
+        if centered:
+            med = statistics.median(values)
+            down, up = widths[finger]
+            result[finger] = {"min": round(max(med - down, 0.0), 1),
+                              "max": round(min(med + up, 180.0), 1),
+                              "promedio": round(statistics.mean(values), 1)}
+        else:  # un ángulo real está en [0°, 180°]
+            result[finger] = _range(values, args.margin, args.holgura_min, 0.0, 180.0)
         r = result[finger]
         print(f"  {finger:10s}  promedio={r['promedio']:6.1f}°  "
               f"rango sugerido=[{r['min']:.1f}°, {r['max']:.1f}°]")
@@ -294,10 +352,6 @@ def cmd_analyze(args):
               "SIN orientación (solo configuración de dedos). Regraba con la muñequera puesta.")
 
     # Guardar/actualizar tolerances.json
-    all_tolerances = {}
-    if os.path.exists(OUTPUT_FILE):
-        with open(OUTPUT_FILE, encoding="utf-8") as f:
-            all_tolerances = json.load(f)
     all_tolerances[args.sign] = result
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         json.dump(all_tolerances, f, indent=2, ensure_ascii=False)
@@ -327,6 +381,8 @@ def main():
                             help="holgura mínima en grados para los dedos (default 6)")
     p_analyze.add_argument("--holgura-orient", type=float, default=10.0,
                             help="holgura mínima en grados para roll/pitch (default 10)")
+    p_analyze.add_argument("--solo-propias", action="store_true",
+                            help="ignora el ancho del dataset público y usa promedio ± margen")
     p_analyze.set_defaults(func=cmd_analyze)
 
     args = parser.parse_args()

@@ -86,7 +86,12 @@ class BLEIMU:
         from bleak import BleakScanner, BleakClient
         self._loop = asyncio.get_running_loop()
         while not self._stop.is_set():
-            device = await BleakScanner.find_device_by_name(DEVICE_NAME, timeout=10)
+            try:  # si el Bluetooth falla al buscar, se reintenta en vez de matar el hilo
+                device = await BleakScanner.find_device_by_name(DEVICE_NAME, timeout=10)
+            except Exception as e:
+                print("BLE (búsqueda):", e)
+                await asyncio.sleep(2)
+                continue
             if device is None:
                 continue
             try:

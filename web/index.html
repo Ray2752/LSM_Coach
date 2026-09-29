@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LSM Coach</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">LSM Coach <span>Seña correcta</span></div>
+    <div class="status" aria-live="polite">
+      <span id="st-imu" class="pill">Muñequera</span>
+      <span id="st-cam" class="pill">Cámara</span>
+      <span id="st-cloud" class="pill">Nube</span>
+      <span id="st-link" class="pill bad">Conectando…</span>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="stage">
+      <div class="video-wrap">
+        <img id="video" src="/video/0" alt="Cámara con la mano detectada">
+        <img id="video2" class="pip" alt="Segunda cámara" hidden>
+        <div id="verdict" class="verdict wait" role="status">Conectando…</div>
+      </div>
+    </section>
+
+    <aside class="panel">
+      <section class="target">
+        <div class="label">Seña objetivo</div>
+        <div class="target-row">
+          <div id="target-letter" class="letter">–</div>
+          <div>
+            <p id="target-desc" class="desc"></p>
+            <p id="target-typical" class="muted"></p>
+          </div>
+        </div>
+        <ul id="target-shape" class="shape"></ul>
+      </section>
+
+      <section class="feedback">
+        <h2>Qué corregir</h2>
+        <ul id="issues" class="issues"></ul>
+      </section>
+
+      <section class="gauges">
+        <p id="shape" class="shape-line" hidden></p>
+        <h2>Dedos <small>cerrado ← → extendido</small></h2>
+        <div id="fingers"></div>
+        <div id="orient-block" hidden>
+          <h2>Orientación de la muñeca</h2>
+          <div id="orient"></div>
+        </div>
+      </section>
+    </aside>
+  </main>
+
+  <footer class="bar">
+    <div id="sign-buttons" class="signs" role="group" aria-label="Elegir seña"></div>
+    <button id="speak" class="action">Escuchar corrección <kbd>Espacio</kbd></button>
+    <div id="progress" class="progress" aria-label="Señas logradas"></div>
+    <button id="calib-toggle" class="ghost" aria-expanded="false">Calibración</button>
+  </footer>
+
+  <div id="calib" class="calib" hidden>
+    <label>Persona <input id="person" value="invitado" maxlength="30" autocomplete="off"></label>
+    <button id="rec-ok" class="rec-ok">Guardar muestra correcta</button>
+    <button id="rec-err" class="rec-err">Guardar error intencional</button>
+    <button id="reload" class="ghost">Recargar rangos</button>
+  </div>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>
