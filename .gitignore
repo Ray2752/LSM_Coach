@@ -1,0 +1,19 @@
+# Entornos virtuales
+venv/
+.venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Secretos
+.env
+.env.*
+*.pem
+*.key
+
+# Varios
+*.bak
+.DS_Store
+.vscode/

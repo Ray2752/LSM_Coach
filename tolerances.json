@@ -1,0 +1,191 @@
+{
+  "A": {
+    "pulgar": {
+      "min": 160.6,
+      "max": 183.5,
+      "promedio": 172.1
+    },
+    "indice": {
+      "min": 28.3,
+      "max": 64.7,
+      "promedio": 46.5
+    },
+    "medio": {
+      "min": 15.2,
+      "max": 64.7,
+      "promedio": 39.9
+    },
+    "anular": {
+      "min": -13.9,
+      "max": 68.4,
+      "promedio": 27.2
+    },
+    "menique": {
+      "min": -14.9,
+      "max": 63.1,
+      "promedio": 24.1
+    }
+  },
+  "B": {
+    "pulgar": {
+      "min": 110.2,
+      "max": 126.9,
+      "promedio": 118.6
+    },
+    "indice": {
+      "min": 165.2,
+      "max": 178.5,
+      "promedio": 171.8
+    },
+    "medio": {
+      "min": 167.5,
+      "max": 177.5,
+      "promedio": 172.5
+    },
+    "anular": {
+      "min": 172.2,
+      "max": 178.2,
+      "promedio": 175.2
+    },
+    "menique": {
+      "min": 172.7,
+      "max": 181.5,
+      "promedio": 177.1
+    }
+  },
+  "C": {
+    "pulgar": {
+      "min": 158.9,
+      "max": 173.2,
+      "promedio": 166.1
+    },
+    "indice": {
+      "min": 112.4,
+      "max": 136.2,
+      "promedio": 124.3
+    },
+    "medio": {
+      "min": 92.2,
+      "max": 125.5,
+      "promedio": 108.8
+    },
+    "anular": {
+      "min": 94.3,
+      "max": 127.8,
+      "promedio": 111.0
+    },
+    "menique": {
+      "min": 121.7,
+      "max": 151.3,
+      "promedio": 136.5
+    }
+  },
+  "L": {
+    "pulgar": {
+      "min": 168.0,
+      "max": 174.3,
+      "promedio": 171.1
+    },
+    "indice": {
+      "min": 176.4,
+      "max": 179.5,
+      "promedio": 178.0
+    },
+    "medio": {
+      "min": 35.1,
+      "max": 59.4,
+      "promedio": 47.3
+    },
+    "anular": {
+      "min": 27.6,
+      "max": 60.1,
+      "promedio": 43.9
+    },
+    "menique": {
+      "min": 17.7,
+      "max": 51.6,
+      "promedio": 34.6
+    }
+  },
+  "O": {
+    "pulgar": {
+      "min": 156.7,
+      "max": 169.1,
+      "promedio": 162.9
+    },
+    "indice": {
+      "min": 73.0,
+      "max": 119.0,
+      "promedio": 96.0
+    },
+    "medio": {
+      "min": 69.5,
+      "max": 111.2,
+      "promedio": 90.3
+    },
+    "anular": {
+      "min": 69.7,
+      "max": 105.8,
+      "promedio": 87.7
+    },
+    "menique": {
+      "min": 81.2,
+      "max": 121.1,
+      "promedio": 101.2
+    }
+  },
+  "V": {
+    "pulgar": {
+      "min": 119.8,
+      "max": 135.6,
+      "promedio": 127.7
+    },
+    "indice": {
+      "min": 175.5,
+      "max": 179.5,
+      "promedio": 177.5
+    },
+    "medio": {
+      "min": 176.1,
+      "max": 179.8,
+      "promedio": 178.0
+    },
+    "anular": {
+      "min": 25.5,
+      "max": 42.6,
+      "promedio": 34.0
+    },
+    "menique": {
+      "min": 27.8,
+      "max": 56.6,
+      "promedio": 42.2
+    }
+  },
+  "W": {
+    "pulgar": {
+      "min": 113.3,
+      "max": 124.3,
+      "promedio": 118.8
+    },
+    "indice": {
+      "min": 173.0,
+      "max": 175.5,
+      "promedio": 174.2
+    },
+    "medio": {
+      "min": 172.2,
+      "max": 178.8,
+      "promedio": 175.5
+    },
+    "anular": {
+      "min": 170.7,
+      "max": 179.9,
+      "promedio": 175.3
+    },
+    "menique": {
+      "min": 31.6,
+      "max": 57.2,
+      "promedio": 44.4
+    }
+  }
+}
