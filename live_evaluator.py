@@ -5,10 +5,10 @@ Ponlo en la misma carpeta que tolerance_calculator.py e imu_source.py.
 
 Uso:
     python live_evaluator.py                          # AUTOMÁTICO: detecta la letra solo (necesita model.joblib)
-    python live_evaluator.py --sign A                 # tú eliges la letra; IMU simulado (teclado)
+    python live_evaluator.py --sign A                 # tú eliges la letra; Nano real por BLE
     python live_evaluator.py --sign A --voz           # ESPACIO = te dice en voz alta qué tienes mal
     python live_evaluator.py --sign A --imu none      # solo cámara
-    python live_evaluator.py --sign A --imu ble       # Nano real por BLE
+    python live_evaluator.py --sign A --imu mock      # IMU simulado (solo pruebas, NO en la demo)
 
 Teclas: Q salir. Con IMU simulado: a/d roll, w/s pitch, j/l yaw, r reset.
 """
@@ -162,7 +162,8 @@ def main():
     ap.add_argument("--modelo", default="model.joblib")
     ap.add_argument("--umbral", type=float, default=0.6,
                     help="confianza mínima para dar por buena la letra detectada")
-    ap.add_argument("--imu", choices=["mock", "ble", "none"], default="mock")
+    ap.add_argument("--imu", choices=["mock", "ble", "none"], default="ble",
+                    help="ble = Nano real (por defecto); mock solo para pruebas sin hardware")
     ap.add_argument("--voz", action="store_true", help="ESPACIO: dice en voz alta qué tienes mal")
     args = ap.parse_args()
 
@@ -247,10 +248,15 @@ def main():
 
             if imu:
                 v = imu.latest
-                cv2.putText(frame,
-                            f"IMU roll={v['roll']:.0f} pitch={v['pitch']:.0f} yaw={v['yaw']:.0f}",
-                            (10, h - 40), cv2.FONT_HERSHEY_SIMPLEX, 0.55, YELLOW, 2)
-                for p in evaluate_orientation(v, tol):
+                linked = getattr(imu, "connected", True)  # MockIMU no tiene .connected
+                if linked:
+                    cv2.putText(frame,
+                                f"IMU roll={v['roll']:.0f} pitch={v['pitch']:.0f} yaw={v['yaw']:.0f}",
+                                (10, h - 40), cv2.FONT_HERSHEY_SIMPLEX, 0.55, YELLOW, 2)
+                else:  # sin conexión no se evalúa la muñeca con ceros falsos
+                    cv2.putText(frame, "IMU: buscando LSM-Wrist...", (10, h - 40),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.55, RED, 2)
+                for p in (evaluate_orientation(v, tol) if linked else []):
                     all_ok = False
                     problems.append("Corrige la muñeca")
                     cv2.putText(frame, "Muñeca -> " + p, (10, y),
