@@ -1,6 +1,6 @@
-opencv-python
-mediapipe
-numpy
+# MediaPipe 0.10.21: las versiones 0.10.30+ y 1.x eliminaron mp.solutions, que usa el código.
+# Trae opencv-contrib-python (cv2) y numpy<2; no instales opencv-python aparte.
+mediapipe==0.10.21
 bleak
 scikit-learn
 joblib
