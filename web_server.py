@@ -154,14 +154,14 @@ class Camera:
         if self.index == "auto":
             for dev in linux_video_devices():
                 cap = self._open_device(dev)
-                if cap.isOpened() and cap.read()[0]:
+                if cap.isOpened() and self._gives_image(cap):
                     print(f"Cámara: {dev}")
                     self.device = dev
                     return cap
                 cap.release()
             if shutil.which("rpicam-vid"):  # sin cámara USB: la CSI de la Raspberry Pi (AI Camera)
                 cap = RpicamCapture(self.width, self.height)
-                if cap.isOpened() and cap.read()[0]:
+                if cap.isOpened() and self._gives_image(cap):
                     print("Cámara: CSI de la Raspberry Pi (rpicam-vid)")
                     self.device = "rpicam"
                     return cap
@@ -169,6 +169,15 @@ class Camera:
             return cv2.VideoCapture()  # ninguna: queda "sin abrir"
         self.device = self.index
         return self._open_device(self.index)
+
+    @staticmethod
+    def _gives_image(cap, tries=5):
+        """El primer fotograma de una cámara USB recién abierta a veces falla: se insiste un poco."""
+        for _ in range(tries):
+            if cap.read()[0]:
+                return True
+            time.sleep(0.1)
+        return False
 
     def _open_device(self, dev):
         # En Linux se abre por V4L2 y en MJPG: en la UNO Q, YUYV solo llega a 30 fps hasta 640x480
@@ -222,6 +231,7 @@ class Runtime:
                            classify_every=2 if getattr(args, "lite", False) else 1)
         self.coach.notify = self.notify
         self.tracker = None
+        self.t0, self._no_face_warned = time.time(), False
         if args.seguir:  # cámara motorizada (servos en la UNO Q): sigue el rostro de la persona
             # En segundo plano y con reintentos: en la demo las placas arrancan solas y no se
             # sabe cuál enciende primero; cuando la UNO Q aparezca en la red, empieza a seguir.
@@ -248,6 +258,7 @@ class Runtime:
 
     def _find_tracker(self, remote):
         from pan_tilt import make_tracker
+        print("Cámara motorizada: buscando los servos (router local o UNO Q en la red)...", flush=True)
         while self.tracker is None:
             tracker = make_tracker(remote)  # "auto": router local o la UNO Q por red (~5 s)
             if tracker is not None:
@@ -295,8 +306,15 @@ class Runtime:
             self._event_id += 1
             self.achievement = {"id": self._event_id, **achievement}
         if self.tracker:
-            self.tracker.update(self.coach._face, time.time(), busy=self.coach.busy,
-                                face_t=self.coach.face_t)
+            moved = self.tracker.update(self.coach._face, time.time(), busy=self.coach.busy,
+                                        face_t=self.coach.face_t)
+            if moved and self.tracker.moves in (1, 50):  # diagnóstico: que se vea que sigue
+                print(f"Cámara motorizada: siguiendo el rostro (pan {self.tracker.pan:.0f}, "
+                      f"tilt {self.tracker.tilt:.0f}).", flush=True)
+            elif self.coach._face is None and not self._no_face_warned and time.time() - self.t0 > 20:
+                self._no_face_warned = True
+                print("Cámara motorizada: aún no se detecta ningún rostro (¿la persona sale en la imagen?).",
+                      flush=True)
         self.jpeg[0] = encode(frame)
         for i, cam in enumerate(self.cams[1:], start=1):
             other, _ = cam.read()

@@ -239,7 +239,9 @@ class Coach:
         if self._frame_i % 3 != 1:
             return
         if self.face_det is None:
-            self.face_det = mp.solutions.face_detection.FaceDetection(model_selection=0,
+            # 0 = corto alcance (hasta ~2 m), 1 = largo alcance (hasta ~5 m): con la cámara
+            # motorizada la persona puede estar más lejos.
+            self.face_det = mp.solutions.face_detection.FaceDetection(model_selection=1 if self.track_face else 0,
                                                                       min_detection_confidence=0.5)
         res = self.face_det.process(rgb)
         if res.detections:

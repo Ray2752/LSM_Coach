@@ -78,6 +78,8 @@ if command -v gsettings >/dev/null 2>&1; then
 fi
 command -v xset >/dev/null 2>&1 && xset s off -dpms 2>/dev/null
 
+# Un servidor viejo (de una prueba anterior) se queda con la cámara y el puerto: fuera.
+pkill -f "python web_server.py" 2>/dev/null; pkill -x rpicam-vid 2>/dev/null; sleep 1
 # --cam auto: la cámara USB cambia de /dev/videoN entre reinicios.
 # shellcheck disable=SC2086
 python web_server.py --cam auto --res "$RES" --imu "$IMU" $LITE $MODEL $EXTRA &
@@ -114,3 +116,4 @@ fi
 
 kill $SERVER 2>/dev/null
 wait $SERVER 2>/dev/null
+pkill -x rpicam-vid 2>/dev/null  # por si la cámara CSI quedó abierta
