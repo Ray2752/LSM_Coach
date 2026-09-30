@@ -169,17 +169,32 @@ pecho, espacio neutro) y movimiento. No hay dataset público de LSM con ellas: h
    - **En la app:** elegir la palabra (pestaña Palabras), abrir ⚙ Calibración, poner el nombre de
      la persona y pulsar **Guardar correcta**: la siguiente seña completa (mano quieta al final)
      se guarda sola, con la posición del rostro.
-   - **De videos** (una ejecución por clip, de frente, con el rostro visible):
+   - **De videos** (de frente, con el rostro visible):
      `python extract_words.py --word HOLA --person ana hola1.mp4 hola2.mp4` o
-     `python extract_words.py --dir videos_palabras` (subcarpetas HOLA/, GRACIAS/, ...); con
-     `--auto` separa varias ejecuciones de un mismo video por el movimiento.
-2. `python train_words.py` → `model_words.joblib` (mide dejando fuera a cada persona).
+     `python extract_words.py --dir videos_palabras/<fuente> --person <fuente> --auto`
+     (subcarpetas HOLA/, GRACIAS/, POR_FAVOR/, ...). Con `--auto` separa las ejecuciones de un
+     mismo video por el movimiento de la muñeca e imprime los segundos de cada una; sin él,
+     cada clip es una ejecución. `--person` debe ser la persona o la fuente: así la medición
+     deja fuera a cada una.
+2. `python train_words.py` → `model_words.joblib`. Cada ejecución se añade también recortada
+   al inicio y al final (el detector en vivo no corta igual que al extraer: con esto POR FAVOR
+   de una fuente nueva pasó de 0-40 % a 75 %) y se omiten las que la app rechazaría por poco
+   recorrido. Mide dejando fuera a cada persona/fuente (solo vale para las palabras con 2+) y
+   por ejecución con validación cruzada (optimista).
 3. Reiniciar el servidor (o **Recargar rangos**). Las palabras con modelo se evalúan como las
    letras con movimiento; las que no tienen muestras se pueden practicar deletreadas
    (botón **Deletrear** en la tarjeta de la palabra).
 
 Las muestras quedan en `samples_words/<PALABRA>/*.npz` con índice en `samples_words/index.csv`.
-Referencias opcionales: `web/ref/words/<PALABRA>.gif` (POR_FAVOR con guion bajo).
+Referencias: `web/ref/words/<PALABRA>.gif` (POR_FAVOR con guion bajo), un ciclo de la seña.
+
+Estado actual: las muestras vienen de videos públicos de redes sociales (ver Declaración de
+recursos), recortados por palabra en `videos_palabras/` (fuera del repositorio): GRACIAS 8 y
+HOLA 1 (Dilo en señas), POR FAVOR 10 (CONADIS y TikTok), AYUDA 7 (TikTok), MAMÁ 14 (USAER 274).
+Con una sola fuente por palabra el modelo es frágil con personas nuevas: **hay que grabar en la
+app, con la cámara de la demo, 10+ ejecuciones por palabra de 2 personas; HOLA es la urgente**.
+POR FAVOR, AYUDA y GRACIAS son señas de dos manos y MediaPipe va con una sola: toma la más
+visible, igual al entrenar que en vivo.
 
 ## Cámara motorizada (UNO Q + 2 servos SG90)
 
@@ -231,4 +246,10 @@ python -m unittest discover -s tests -t .
   - Navarrete-López, J. A. y López-Nava, I. H. *Mexican Sign Language Alphabet (dynamic signs
     only)*. Zenodo. https://doi.org/10.5281/zenodo.14689869 — animaciones de referencia de
     J, K, Ñ, Q, X, Z.
+- **Videos públicos de LSM (Nivel 3):** de cada uno se extrajeron solo los puntos de la mano y
+  del rostro (MediaPipe) para entrenar las palabras, y un ciclo de la seña como GIF de
+  referencia en la interfaz: guía *Saludos* de **Dilo en señas** (HOLA, GRACIAS), *Saludos y
+  expresiones en Lengua de Señas Mexicana* de **CONADIS** (POR FAVOR), y videos en TikTok de
+  una intérprete (#porfavor #lsm: POR FAVOR, AYUDA) y de **USAER 274** (MAMÁ). Los videos no
+  se redistribuyen.
 - Los datos de calibración con nuestra cámara y la muñequera se graban durante el evento.
