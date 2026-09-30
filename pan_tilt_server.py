@@ -31,12 +31,27 @@ def handle(client, data):
     return None
 
 
+HEALTH_S = 10  # cada tanto se comprueba que la MCU siga contestando
+
+
 def connect_router():
+    """Se conecta al router y comprueba que la MCU tenga registradas las órdenes. Si no
+    ("method status not available"), el sketch registró sus funciones antes de que el router
+    arrancara (o el router se reinició): hay que reiniciar la MCU (botón RESET de la UNO Q o
+    Run en App Lab). Se reintenta cada 3 s hasta que conteste."""
+    warned = 0.0
     while True:
         client = RouterClient()
         if client.connect():
-            client.call("center")
-            return client
+            if client.call("status") is not None:
+                client.call("center")
+                return client
+            client.close()
+            if time.time() - warned > 30:
+                warned = time.time()
+                print("La MCU no tiene registradas las órdenes de los servos: pulsa RESET en la UNO Q "
+                      "(o Run en App Lab) para que el sketch se vuelva a registrar. Reintentando...",
+                      file=sys.stderr, flush=True)
         time.sleep(3)  # el router arranca después del inicio de sesión; se reintenta
 
 
@@ -51,7 +66,7 @@ def main():
     announce = json.dumps({"lsm": "pan_tilt", "port": NET_PORT}).encode()
     print(f"Puente de servos: órdenes por UDP {NET_PORT}, anuncios por difusión en {DISCOVER_PORT}. "
           f"Servos en {client.call('status')}", flush=True)
-    last_announce, n, last_from = 0.0, 0, None
+    last_announce, last_health, n, last_from = 0.0, time.time(), 0, None
     while True:
         now = time.time()
         if now - last_announce >= ANNOUNCE_S:
@@ -60,9 +75,14 @@ def main():
                 announcer.sendto(announce, ("255.255.255.255", DISCOVER_PORT))
             except OSError:
                 pass
+        if now - last_health >= HEALTH_S:
+            last_health = now
+            if client.connected and client.call("status") is None:
+                client.close()  # la MCU dejó de contestar (reinicio del router o de la MCU)
         if not client.connected:
-            print("Router desconectado: reconectando...", file=sys.stderr)
+            print("Router o MCU sin respuesta: reconectando...", file=sys.stderr, flush=True)
             client = connect_router()
+            print(f"Servos de nuevo en {client.call('status')}", flush=True)
         try:
             data, addr = srv.recvfrom(512)
         except socket.timeout:
