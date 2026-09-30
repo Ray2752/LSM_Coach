@@ -40,7 +40,8 @@ DISCOVER_PORT = 8766   # UDP: la UNO Q anuncia "aquí estoy" por difusión cada 
 # --- Ajustes del seguimiento -----------------------------------------------------------
 PAN_CENTER, TILT_CENTER = 90, 90
 PAN_RANGE, TILT_RANGE = (15, 165), (40, 140)
-DEADBAND = 0.08     # fracción de la imagen: dentro de esta zona alrededor del centro no se mueve
+DEADBAND = 0.12     # fracción de la imagen: dentro de esta zona alrededor del centro no se mueve
+                    # (la mano se mueve mucho al señar: con menos, la cámara la persigue sin parar)
 GAIN = 40.0         # grados por unidad de error (error = desplazamiento del rostro, -0.5..0.5)
 MAX_STEP = 4.0      # grados como máximo por actualización
 UPDATE_S = 0.2      # actualizaciones por segundo (5 Hz)
@@ -225,9 +226,29 @@ class NetClient:
             pass
 
 
+HAND_TIMEOUT_S = 1.0  # sin mano más reciente que esto, se sigue el rostro
+
+
+def target_point(hand, hand_t, face, face_t, now):
+    """Qué punto (x, y en 0-1) centrar con la cámara: la **mano** (es lo que se evalúa); en
+    vertical, el punto medio entre mano y rostro para que los dos queden en la imagen (las
+    palabras del Nivel 3 miden la mano respecto al rostro). Sin mano reciente, el rostro,
+    para tener a la persona encuadrada cuando levante la mano. None si no se ve nada."""
+    hand_ok = hand is not None and now - hand_t < HAND_TIMEOUT_S
+    face_ok = face is not None and now - face_t < FACE_TIMEOUT_S
+    if hand_ok and face_ok:
+        return (hand[0], (hand[1] + face[1]) / 2)
+    if hand_ok:
+        return (hand[0], hand[1])
+    if face_ok:
+        return (face[0], face[1])
+    return None
+
+
 class Tracker:
-    """Decide pan/tilt a partir de la posición del rostro. `send(pan, tilt)` se llama solo
-    cuando hay que mover; se inyecta para poder probarlo sin hardware."""
+    """Decide pan/tilt a partir de la posición del punto a seguir (mano o rostro, ver
+    target_point). `send(pan, tilt)` se llama solo cuando hay que mover; se inyecta para
+    poder probarlo sin hardware."""
 
     def __init__(self, send):
         self.send = send
@@ -287,6 +308,52 @@ def make_tracker(remote="auto"):
     return tracker
 
 
+def track_test(client, seconds=40):
+    """Prueba de todo el lazo sin la interfaz: cámara -> mano/rostro -> Tracker -> servos.
+    Imprime cada medio segundo qué ve y qué manda. Cerrar antes la app (usa la cámara)."""
+    import cv2
+    import mediapipe as mp
+    from web_server import Camera
+    cam = Camera("auto", 640, 480)
+    hands = mp.solutions.hands.Hands(max_num_hands=1, min_detection_confidence=0.6, model_complexity=0)
+    det = mp.solutions.face_detection.FaceDetection(model_selection=1, min_detection_confidence=0.5)
+    tracker = Tracker(lambda p, t: client.notify("aim", p, t))
+    tracker.center()
+    print(f"Durante {seconds} s: levanta la mano y llévala a un lado, arriba, abajo...")
+    t_end, last_print = time.time() + seconds, 0.0
+    hand, hand_t, face, face_t = None, 0.0, None, 0.0
+    try:
+        while time.time() < t_end:
+            frame, _ = cam.read()
+            if frame is None:
+                time.sleep(0.01)
+                continue
+            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            now = time.time()
+            hres = hands.process(rgb)
+            if hres.multi_hand_landmarks:
+                palm = [hres.multi_hand_landmarks[0].landmark[i] for i in (0, 5, 9, 13, 17)]
+                hand, hand_t = (sum(p.x for p in palm) / 5, sum(p.y for p in palm) / 5), now
+            fres = det.process(rgb)
+            if fres.detections:
+                b = fres.detections[0].location_data.relative_bounding_box
+                face, face_t = (b.xmin + b.width / 2, b.ymin + b.height / 2, b.width, b.height), now
+            point = target_point(hand, hand_t, face, face_t, now)
+            moved = tracker.update(point, now)
+            if now - last_print > 0.5:
+                last_print = now
+                if point is None:
+                    print("ni mano ni rostro en la imagen", flush=True)
+                else:
+                    what = "mano" if now - hand_t < HAND_TIMEOUT_S else "rostro"
+                    print(f"{what} x={point[0]:.2f} y={point[1]:.2f}  ->  pan {tracker.pan:.0f} tilt {tracker.tilt:.0f}"
+                          + ("  (orden enviada)" if moved else "  (centrado: no se mueve)"), flush=True)
+            time.sleep(0.03)
+    finally:
+        cam.cap.release()
+    print("órdenes enviadas:", tracker.moves, "| servos según la MCU:", client.call("status"))
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--centrar", action="store_true")
@@ -294,11 +361,17 @@ def main():
     ap.add_argument("--apuntar", nargs=2, type=int, metavar=("PAN", "TILT"))
     ap.add_argument("--red", nargs="?", const="auto", metavar="IP",
                     help="hablar con la UNO Q por red (desde la Pi); sin IP la busca sola")
+    ap.add_argument("--prueba", action="store_true",
+                    help="con la cámara: muestra qué ve (mano/rostro) y qué manda a los servos (cierra antes la app)")
     args = ap.parse_args()
     client = make_client(args.red if args.red else "local")
     if client is None:
         sys.exit(1)
     print("estado:", client.call("status"))
+    if args.prueba:
+        track_test(client)
+        client.close()
+        return
     if args.apuntar:
         client.notify("aim", *args.apuntar)
     elif args.barrido:

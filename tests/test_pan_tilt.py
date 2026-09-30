@@ -51,6 +51,21 @@ class TrackerTests(unittest.TestCase):
         self.assertEqual(self.sent[-1][0], PAN_RANGE[1])
 
 
+class TargetPointTests(unittest.TestCase):
+    def test_mano_manda_y_el_tilt_reparte_con_el_rostro(self):
+        p = pan_tilt.target_point((0.8, 0.7), 10.0, (0.5, 0.3), 10.0, now=10.1)
+        self.assertEqual(p, (0.8, 0.5))
+
+    def test_sin_rostro_se_sigue_la_mano(self):
+        self.assertEqual(pan_tilt.target_point((0.8, 0.7), 10.0, None, 0.0, now=10.1), (0.8, 0.7))
+
+    def test_sin_mano_reciente_se_sigue_el_rostro(self):
+        self.assertEqual(pan_tilt.target_point((0.8, 0.7), 5.0, (0.5, 0.3), 10.0, now=10.1), (0.5, 0.3))
+
+    def test_nada_reciente(self):
+        self.assertIsNone(pan_tilt.target_point((0.8, 0.7), 5.0, (0.5, 0.3), 5.0, now=10.1))
+
+
 class FakeRouter:
     """Hace de RouterClient: apunta los servos en memoria."""
 

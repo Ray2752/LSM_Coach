@@ -75,6 +75,7 @@ class Coach:
         self.face_det = None      # detector de rostro (se crea al elegir una palabra)
         self._face, self._frame_i = None, 0
         self.face_t = 0.0         # cuándo se vio el rostro por última vez
+        self._hand_pos, self.hand_t = None, 0.0  # centro de la palma (0-1) y cuándo se vio: cámara motorizada
         self.track_face = False   # detectar el rostro siempre (cámara motorizada que sigue a la persona)
         self._record_word = None  # {"person"}: la próxima seña se guarda como muestra
         self.notify = None        # callable(texto, kind) que pone el servidor para avisar
@@ -151,6 +152,9 @@ class Coach:
 
         lm = res.multi_hand_landmarks[0]
         mp.solutions.drawing_utils.draw_landmarks(frame, lm, mp.solutions.hands.HAND_CONNECTIONS)
+        palm = [lm.landmark[i] for i in (0, 5, 9, 13, 17)]  # muñeca y nudillos: centro de la palma
+        self._hand_pos = (sum(p.x for p in palm) / 5, sum(p.y for p in palm) / 5)
+        self.hand_t = now
         raw = landmarks_to_angles(lm.landmark)
         for f, a in raw.items():
             self.history[f].append(a)

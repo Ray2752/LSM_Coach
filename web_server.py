@@ -306,14 +306,17 @@ class Runtime:
             self._event_id += 1
             self.achievement = {"id": self._event_id, **achievement}
         if self.tracker:
-            moved = self.tracker.update(self.coach._face, time.time(), busy=self.coach.busy,
-                                        face_t=self.coach.face_t)
+            from pan_tilt import target_point
+            now = time.time()
+            c = self.coach
+            point = target_point(c._hand_pos, c.hand_t, c._face, c.face_t, now)
+            moved = self.tracker.update(point, now, busy=c.busy)
             if moved and self.tracker.moves in (1, 50):  # diagnóstico: que se vea que sigue
-                print(f"Cámara motorizada: siguiendo el rostro (pan {self.tracker.pan:.0f}, "
+                print(f"Cámara motorizada: siguiendo (pan {self.tracker.pan:.0f}, "
                       f"tilt {self.tracker.tilt:.0f}).", flush=True)
-            elif self.coach._face is None and not self._no_face_warned and time.time() - self.t0 > 20:
+            elif point is None and not self._no_face_warned and now - self.t0 > 20:
                 self._no_face_warned = True
-                print("Cámara motorizada: aún no se detecta ningún rostro (¿la persona sale en la imagen?).",
+                print("Cámara motorizada: aún no se detecta ni mano ni rostro (¿la persona sale en la imagen?).",
                       flush=True)
         self.jpeg[0] = encode(frame)
         for i, cam in enumerate(self.cams[1:], start=1):
