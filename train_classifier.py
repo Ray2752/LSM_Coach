@@ -87,6 +87,8 @@ def main():
     ap.add_argument("--publicos", action="store_true",
                     help="incluye el dataset público importado con import_msl.py (samples_public/)")
     ap.add_argument("--signs", nargs="+", help="solo estas señas (default: todas)")
+    ap.add_argument("--errores-de", nargs="+", metavar="PERSONA",
+                    help="usa solo los errores de estas personas (las que definen qué es un error)")
     ap.add_argument("--sin-validar", action="store_true",
                     help="no calcula la precisión dejando una persona fuera (es lo más lento)")
     ap.add_argument("--errores", action="store_true",
@@ -105,6 +107,10 @@ def main():
     X, y, persons, skipped = load_samples(dirs, args.signs)
     if args.errores:
         Xe, ye, pe, _ = load_samples((ERRORS_DIR,), args.signs, suffix=ERROR_SUFFIX)
+        if args.errores_de:
+            keep = [i for i, p in enumerate(pe) if p in args.errores_de]
+            Xe, ye, pe = [Xe[i] for i in keep], [ye[i] for i in keep], [pe[i] for i in keep]
+            print(f"Errores solo de: {', '.join(args.errores_de)} ({len(Xe)} muestras)")
         X, y, persons = X + Xe, y + ye, persons + pe
     if skipped:
         print("Muestras ignoradas por no tener landmarks (formato viejo): "

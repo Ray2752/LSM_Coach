@@ -71,6 +71,58 @@ class Judge:
         return shape_issue(self.probs(feats), sign) is None
 
 
+def cross_person(signs, tolerances, require_imu):
+    """Deja fuera a cada persona: entrena el clasificador con las demás (más el dataset
+    público) y la evalúa con sus correctas y sus errores. Es la cifra honesta para alguien
+    que el sistema nunca vio (como un integrante del jurado)."""
+    from import_msl import PUBLIC_DIR
+    from train_classifier import ERROR_SUFFIX, load_samples, make_model
+    Xp, yp, _, _ = load_samples((PUBLIC_DIR,))
+    correct = {s: load_rows(f"{DATA_DIR}/{s}.csv") for s in signs if os.path.exists(f"{DATA_DIR}/{s}.csv")}
+    errors = {s: load_rows(f"{ERRORS_DIR}/{s}.csv") for s in signs if os.path.exists(f"{ERRORS_DIR}/{s}.csv")}
+    all_c = {s: load_rows(p) for p in glob.glob(f"{DATA_DIR}/*.csv") for s in [sign_of(p)]}
+    all_e = {s: load_rows(p) for p in glob.glob(f"{ERRORS_DIR}/*.csv") for s in [sign_of(p)]}
+    people = sorted({r[0] for rows in list(correct.values()) + list(errors.values()) for r in rows})
+    per_sign = {s: [0, 0, 0, 0] for s in signs}
+    print(f"Dejando fuera a cada persona ({', '.join(people)}); tarda ~15 s por persona...\n")
+    print(f"{'persona':10s} {'acepta correctas':>17s} {'rechaza errores':>16s}")
+    for person in people:
+        X, y = list(Xp), list(yp)
+        for s, rows in all_c.items():
+            X += [r[3] for r in rows if r[0] != person and r[3]]
+            y += [s for r in rows if r[0] != person and r[3]]
+        for s, rows in all_e.items():
+            X += [r[3] for r in rows if r[0] != person and r[3]]
+            y += [s + ERROR_SUFFIX for r in rows if r[0] != person and r[3]]
+        judge = Judge(make_model().fit(X, y), require_imu)
+        a = n = rj = ne = 0
+        for s in signs:
+            for r in correct.get(s, []):
+                if r[0] == person:
+                    ok = judge.passes(r, s, tolerances[s])
+                    a, n = a + ok, n + 1
+                    per_sign[s][0] += ok
+                    per_sign[s][1] += 1
+            for r in errors.get(s, []):
+                if r[0] == person:
+                    bad = not judge.passes(r, s, tolerances[s])
+                    rj, ne = rj + bad, ne + 1
+                    per_sign[s][2] += bad
+                    per_sign[s][3] += 1
+        pct = lambda x, t: f"{100 * x / t:.0f}% ({x}/{t})" if t else "—"
+        print(f"{person:10s} {pct(a, n):>17s} {pct(rj, ne):>16s}")
+    print(f"\n{'seña':5s} {'acepta correctas':>17s} {'rechaza errores':>16s}")
+    tot = [0, 0, 0, 0]
+    for s, v in per_sign.items():
+        if v[1] or v[3]:
+            print(f"{s:5s} {v[0] / max(v[1], 1) * 100:>16.0f}% {v[2] / max(v[3], 1) * 100:>15.0f}%")
+            tot = [t + x for t, x in zip(tot, v)]
+    if tot[1] and tot[3]:
+        print(f"\nCon personas que el modelo no vio: acepta {100 * tot[0] / tot[1]:.0f}% de las correctas, "
+              f"rechaza {100 * tot[2] / tot[3]:.0f}% de los errores -> aciertos correctas vs. errores "
+              f"{100 * (tot[0] + tot[2]) / (tot[1] + tot[3]):.0f}% (meta >= 90%)")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--signs", nargs="*", help="señas a evaluar (default: todas las calibradas)")
@@ -78,6 +130,9 @@ def main():
                     help="ignora la orientación aunque la seña la tenga calibrada")
     ap.add_argument("--sin-clasificador", action="store_true",
                     help=f"solo reglas por dedo, sin {MODEL_FILE}")
+    ap.add_argument("--por-persona", action="store_true",
+                    help="deja fuera a cada persona y la evalúa con un modelo que no la vio "
+                         "(la cifra honesta; tarda unos minutos)")
     args = ap.parse_args()
 
     try:
@@ -85,6 +140,11 @@ def main():
             tolerances = json.load(f)
     except FileNotFoundError:
         sys.exit(f"No existe {OUTPUT_FILE}. Corre primero: python tolerance_calculator.py analyze --sign A")
+
+    if args.por_persona:
+        signs = args.signs or [sign_of(p) for p in sorted(glob.glob(f"{DATA_DIR}/*.csv"))
+                               if sign_of(p) in tolerances]
+        return cross_person(signs, tolerances, require_imu=not args.sin_imu)
 
     model = None
     if not args.sin_clasificador and os.path.exists(MODEL_FILE):

@@ -5,7 +5,7 @@
 import unittest
 
 from evaluation import CONFIG, ORIENT, evaluate
-from tolerance_calculator import _range, one_sided, rotate_upright
+from tolerance_calculator import _range, mirror_features, one_sided, rotate_upright
 
 TOL = {f: {"min": 160.0, "max": 180.0} for f in ("pulgar", "indice", "medio", "anular", "menique")}
 TOL_ORIENT = {**TOL, "orientacion": {"roll": {"min": -10, "max": 10},
@@ -62,6 +62,15 @@ class RangeTests(unittest.TestCase):
     def test_limites_fisicos(self):
         r = _range([5.0, 175.0], margin=2.0, floor=6.0, lo_limit=0.0, hi_limit=180.0)
         self.assertEqual((r["min"], r["max"]), (0.0, 180.0))
+
+
+class MirrorTests(unittest.TestCase):
+    def test_refleja_solo_x_y_dos_veces_vuelve_igual(self):
+        f = [float(i) for i in range(63)]
+        m = mirror_features(f)
+        self.assertEqual(m[0:3], [-0.0, 1.0, 2.0])
+        self.assertEqual(m[3:6], [-3.0, 4.0, 5.0])
+        self.assertEqual(mirror_features(m), f)
 
 
 class OneSidedTests(unittest.TestCase):

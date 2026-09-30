@@ -138,6 +138,9 @@ def main():
                     help="grupos del dataset para los rangos por dedo (default: A B)")
     ap.add_argument("--percentiles", nargs=2, type=float, metavar=("BAJO", "ALTO"),
                     help="percentiles para --guardar (default: el mejor de la tabla)")
+    ap.add_argument("--incluir-propias", action="store_true",
+                    help="al guardar, amplía cada rango para que también acepte las muestras "
+                         f"correctas propias ({DATA_DIR}/, percentiles 5-95, sin valores extremos)")
     ap.add_argument("--guardar", action="store_true",
                     help=f"guarda en {OUTPUT_FILE} rangos calculados con TODOS los participantes")
     args = ap.parse_args()
@@ -250,10 +253,21 @@ def main():
         if os.path.exists(OUTPUT_FILE):
             with open(OUTPUT_FILE, encoding="utf-8") as f:
                 all_tol = json.load(f)
+        if args.incluir_propias:
+            for sign, rng in full.items():
+                rows = own.get(sign, [])
+                if len(rows) < 10:
+                    continue
+                for k in FINGER_JOINTS:
+                    values = [r[2][k] for r in rows]
+                    rng[k] = one_sided({"min": round(min(rng[k]["min"], pct(values, 5)), 1),
+                                        "max": round(max(rng[k]["max"], pct(values, 95)), 1),
+                                        "promedio": rng[k]["promedio"]})
         for sign, rng in full.items():
             old = all_tol.get(sign, {})
             entry = {**rng, "fuente": f"{SOURCE}, grupos {''.join(sorted(groups))}, "
-                                      f"{n_people} personas, percentiles {lo}-{hi}",
+                                      f"{n_people} personas, percentiles {lo}-{hi}"
+                                      + (" + muestras propias" if args.incluir_propias else ""),
                      # ancho de la población (abajo, arriba) para centrar el rango en cada usuario
                      "ancho": {k: [round(d, 1), round(u, 1)] for k, (d, u) in full_widths[sign].items()}}
             if old.get("orientacion"):  # la orientación (IMU) se conserva: el dataset no la tiene

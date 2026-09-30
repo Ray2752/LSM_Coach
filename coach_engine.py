@@ -15,7 +15,8 @@ import mediapipe as mp
 
 from evaluation import CONFIG, ERROR_SUFFIX, FINGER_LABEL, evaluate, shape_issue
 from signs import NIVEL_1
-from tolerance_calculator import FINGER_JOINTS, landmarks_to_angles, landmarks_to_features
+from tolerance_calculator import (FINGER_JOINTS, landmarks_to_angles, landmarks_to_features,
+                                  mirror_features)
 
 SMOOTH_FRAMES = 5
 PERSIST_S = 0.6   # el error debe durar esto para avisar (evita avisos por parpadeos)
@@ -100,11 +101,14 @@ class Coach:
         for f, a in raw.items():
             self.history[f].append(a)
         angles = {f: sum(v) / len(v) for f, v in self.history.items()}
-        self.last_sample = {"angles": raw, "landmarks": landmarks_to_features(lm.landmark),
-                            "imu": dict(imu) if imu else None}
         state["hand"] = True
         if res.multi_handedness:
             state["handedness"] = res.multi_handedness[0].classification[0].label
+        features = landmarks_to_features(lm.landmark)
+        if state["handedness"] == "Left":  # mano izquierda: se refleja para usar el mismo modelo
+            features = mirror_features(features)
+        self.last_sample = {"angles": raw, "landmarks": features,
+                            "imu": dict(imu) if imu else None}
 
         if tol is None:
             state["verdict"] = "uncalibrated"

@@ -35,6 +35,7 @@ from tolerance_calculator import OUTPUT_FILE, append_sample
 
 WEB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web")
 VIBRATE_MS = 250
+MIN_SAVE_GAP_S = 0.7  # entre dos muestras: evita ráfagas de fotos casi idénticas
 STATE_HZ = 10
 VIDEO_FPS = 25
 JPEG_QUALITY = 80
@@ -128,6 +129,7 @@ class Runtime:
         self.state = {}
         self.fps = 0.0
         self.message = None  # aviso breve para la interfaz: {"id", "text", "kind"}
+        self._last_save = 0.0
         self._msg_id = 0
         self._lock = threading.Lock()  # protege al Coach (hilo de visión vs. órdenes web)
         threading.Thread(target=self._loop, daemon=True).start()
@@ -209,12 +211,15 @@ class Runtime:
     def record(self, is_error):
         with self._lock:
             sample, sign = self.coach.last_sample, self.coach.target
+        if time.time() - self._last_save < MIN_SAVE_GAP_S:
+            return self.notify("Muy rápido: cambia un poco la mano y vuelve a guardar", "bad")
         if sign in DYNAMIC:  # una sola imagen no captura el movimiento: dañaría el modelo
             return self.notify(f"La {sign} lleva movimiento: todavía no se puede grabar", "bad")
         if sample is None:
             return self.notify("No veo la mano: no se guardó", "bad")
         if self.imu and sample["imu"] is None:
             return self.notify("La muñequera no está conectada: no se guardó", "bad")
+        self._last_save = time.time()
         append_sample(sign, self.person, sample["angles"], sample["landmarks"], sample["imu"],
                       errores=is_error)
         self.store.add_sample(self.person, sign, sample["angles"], sample["landmarks"],

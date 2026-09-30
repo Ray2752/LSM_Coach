@@ -57,10 +57,16 @@ Opciones: `--cam2 N` agrega una segunda cámara; `--imu none` corre sin muñeque
 3. Entrena y mide:
 
 ```bash
-python train_classifier.py --publicos --errores --signs A B C L Y   # aprende también los errores
+python curate.py exp3:Y --aplicar                 # aparta muestras mal etiquetadas (persona:seña)
+python evaluate_public.py --percentiles 1 99 --incluir-propias --guardar   # rangos de los dedos
+python train_classifier.py --publicos --errores --errores-de invitado      # errores de la referencia
 for s in A B C L Y; do python tolerance_calculator.py analyze --sign $s; done   # orientación (IMU)
-python evaluate_accuracy.py --signs A B C L Y                        # meta de la rúbrica: >= 90 %
+python evaluate_accuracy.py --por-persona         # cifra honesta: deja fuera a cada persona
 ```
+
+Los errores los define una persona de referencia que sabe LSM (`--errores-de`): si cada
+quien graba sus propios "errores", se contradicen (lo que uno graba como error otro lo hace
+como correcto) y el modelo aprende cosas opuestas.
 
 Pulsa **Recargar rangos** en la interfaz para usar lo nuevo.
 

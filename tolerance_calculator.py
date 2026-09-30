@@ -114,6 +114,12 @@ def landmarks_to_features(landmarks):
     return [round(v, 5) for v in feats]
 
 
+def mirror_features(features):
+    """Refleja una mano (x -> -x) en los 63 números de landmarks_to_features: convierte
+    una mano izquierda en la geometría de una derecha. Los ángulos de los dedos no cambian."""
+    return [-v if i % 3 == 0 else v for i, v in enumerate(features)]
+
+
 def one_sided(rng):
     """Un dedo que debe ir CERRADO no puede estar "demasiado cerrado", y uno EXTENDIDO no
     puede estar "demasiado extendido": el error real es solo hacia el otro lado. Por eso
