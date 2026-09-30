@@ -117,7 +117,7 @@ class Camera:
 
     def _open_device(self, dev):
         # En Linux se abre por V4L2 y en MJPG: en la UNO Q, YUYV solo llega a 30 fps hasta 640x480
-        cap = cv2.VideoCapture(dev, cv2.CAP_V4L2) if sys.platform.startswith("linux") else cv2.VideoCapture(dev)
+        cap = cv2.VideoCapture(v4l_index(dev), cv2.CAP_V4L2) if sys.platform.startswith("linux") else cv2.VideoCapture(dev)
         if sys.platform.startswith("linux"):
             cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
@@ -400,6 +400,14 @@ def linux_video_devices():
     return sorted(glob.glob("/dev/video*"), key=lambda p: int(p[len("/dev/video"):] or 0))
 
 
+def v4l_index(dev):
+    """El backend V4L2 de OpenCV en la UNO Q no abre por nombre ("/dev/video2"), solo por
+    número (2 -> /dev/video2). Convierte la ruta a número; lo demás se deja igual."""
+    if isinstance(dev, str) and dev.startswith("/dev/video") and dev[len("/dev/video"):].isdigit():
+        return int(dev[len("/dev/video"):])
+    return dev
+
+
 def cam_arg(value):
     """--cam acepta un número, una ruta /dev/videoN o 'auto'."""
     return int(value) if value.isdigit() else value
@@ -414,7 +422,7 @@ def list_cams(max_index=6):
     devices = linux_video_devices() if linux else range(max_index)
     print(("Ruta" if linux else "Índice") + "   resolución   foto")
     for i in devices:
-        cap = cv2.VideoCapture(i, cv2.CAP_V4L2) if linux else cv2.VideoCapture(i)
+        cap = cv2.VideoCapture(v4l_index(i), cv2.CAP_V4L2) if linux else cv2.VideoCapture(i)
         if not cap.isOpened():
             if linux:
                 continue
