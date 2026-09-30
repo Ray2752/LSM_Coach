@@ -161,7 +161,8 @@ class Runtime:
         self.tolerances = load_tolerances()
         self.coach = Coach(self.tolerances, target=args.sign, require_imu=args.imu != "none",
                            model=load_model(), dyn_model=load_dynamic_model(),
-                           word_model=load_word_model())
+                           word_model=load_word_model(),
+                           hands_complexity=0 if getattr(args, "modelo_ligero", False) else 1)
         self.coach.notify = self.notify
         self.tracker = None
         if args.seguir:  # cámara motorizada (UNO Q + servos): sigue el rostro de la persona
@@ -462,6 +463,8 @@ def main():
     ap.add_argument("--port", type=int, default=8000)
     ap.add_argument("--lite", action="store_true",
                     help="UNO Q: video MJPEG más ligero (calidad 55, 12 fps) e interfaz sin efectos")
+    ap.add_argument("--modelo-ligero", action="store_true",
+                    help="modelo ligero de manos de MediaPipe (~2x más rápido; ver uno_q/bench.py)")
     ap.add_argument("--seguir", action="store_true",
                     help="cámara motorizada (UNO Q + servos, uno_q/pan_tilt): sigue el rostro de la persona")
     ap.add_argument("--list-cams", action="store_true", help="muestra las cámaras y sale")

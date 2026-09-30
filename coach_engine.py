@@ -60,7 +60,7 @@ class AlertPolicy:
 
 class Coach:
     def __init__(self, tolerances, target=NIVEL_1[0], require_imu=True, model=None, dyn_model=None,
-                 word_model=None):
+                 word_model=None, hands_complexity=1):
         self.tolerances = tolerances
         self.require_imu = require_imu
         self.model = model        # clasificador de landmarks (opcional)
@@ -75,7 +75,9 @@ class Coach:
         self._record_word = None  # {"person"}: la próxima seña se guarda como muestra
         self.notify = None        # callable(texto, kind) que pone el servidor para avisar
         self.proba_hist = deque(maxlen=SMOOTH_FRAMES)
-        self.hands = mp.solutions.hands.Hands(max_num_hands=1, min_detection_confidence=0.6)
+        # model_complexity 0 = modelo ligero de manos (~2x más rápido, algo menos preciso): UNO Q
+        self.hands = mp.solutions.hands.Hands(max_num_hands=1, min_detection_confidence=0.6,
+                                              model_complexity=hands_complexity)
         self.history = {f: deque(maxlen=SMOOTH_FRAMES) for f in FINGER_JOINTS}
         self.feat_hist = deque(maxlen=SMOOTH_FRAMES)  # landmarks, para las reglas de forma
         self.alerts = AlertPolicy()
