@@ -20,7 +20,7 @@ UPDATE_S = 0.2
 FACE_TIMEOUT_S = 1.0
 HAND_TIMEOUT_S = 1.0
 PAN_SIGN, TILT_SIGN = -1, -1
-PAN_ENABLED = True
+PAN_ENABLED = False
 
 
 class RouterClient:
