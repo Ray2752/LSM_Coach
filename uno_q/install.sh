@@ -12,6 +12,10 @@ REPO="https://github.com/Ray2752/LSM_Coach.git"
 DIR="$HOME/LSM_Coach"
 
 echo "== 1/6 Paquetes del sistema (git, navegador, bluetooth, v4l2, librerías de OpenCV)"
+# Algunas redes (hotspot de celular, campus) bloquean HTTP sin cifrar y apt recibe "403
+# Forbidden" de deb.debian.org. Los repositorios de Debian aceptan HTTPS: se cambian.
+sudo sed -i 's|http://deb.debian.org|https://deb.debian.org|g; s|http://security.debian.org|https://security.debian.org|g' \
+  /etc/apt/sources.list /etc/apt/sources.list.d/*.sources /etc/apt/sources.list.d/*.list 2>/dev/null || true
 sudo apt-get update
 sudo apt-get install -y git curl v4l-utils bluez libportaudio2 libgl1 libglib2.0-0
 sudo apt-get install -y chromium || sudo apt-get install -y firefox-esr
