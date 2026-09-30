@@ -9,12 +9,30 @@ MockIMU  : simulado, se mueve con el teclado (para probar sin hardware).
 BLEIMU   : lee el Nano 33 BLE Sense Rev2 por BLE (requiere: pip install bleak).
 """
 import asyncio
+import os
 import struct
 import threading
 
 DEVICE_NAME = "LSM-Wrist"
 CHAR_UUID = "19B10001-E8F2-537E-4F6C-D104768A1214"  # orientación (notify)
 VIB_UUID = "19B10002-E8F2-537E-4F6C-D104768A1214"   # vibración (write)
+ADDR_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".lsm_wrist_addr")
+
+
+def save_address(addr):
+    try:
+        with open(ADDR_FILE, "w", encoding="utf-8") as f:
+            f.write(addr.strip())
+    except OSError:
+        pass
+
+
+def load_address():
+    try:
+        with open(ADDR_FILE, encoding="utf-8") as f:
+            return f.read().strip() or None
+    except OSError:
+        return None
 
 
 class MockIMU:
@@ -60,7 +78,12 @@ class BLEIMU:
         self._thread.start()
 
     def stop(self):
+        """Pide desconectar y espera a que ocurra. Importante en Linux (UNO Q): si el programa
+        muere sin desconectar, bluez deja la Nano "conectada" sin que nadie la escuche, y como
+        conectada no se anuncia, el siguiente arranque no la encuentra."""
         self._stop.set()
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=3.0)
 
     def vibrate(self, ms: int = 200):
         """Manda la orden al Nano (1 byte = duración en unidades de 10 ms)."""
@@ -87,22 +110,33 @@ class BLEIMU:
         self._loop = asyncio.get_running_loop()
         while not self._stop.is_set():
             try:  # si el Bluetooth falla al buscar, se reintenta en vez de matar el hilo
-                device = await BleakScanner.find_device_by_name(DEVICE_NAME, timeout=10)
+                device = await BleakScanner.find_device_by_name(DEVICE_NAME, timeout=8)
             except Exception as e:
                 print("BLE (búsqueda):", e)
                 await asyncio.sleep(2)
                 continue
             if device is None:
-                continue
+                # No se anuncia: puede que bluez (Linux) la tenga conectada de una sesión anterior.
+                # Conectar por la dirección guardada funciona aunque ya esté "tomada".
+                device = load_address()
+                if device is None:
+                    continue
+                print(f"LSM-Wrist no se anuncia; intento por dirección {device}...")
             try:
                 async with BleakClient(device) as client:
                     self._client = client
                     self.connected = True
+                    save_address(client.address)
                     await client.start_notify(CHAR_UUID, self._on_data)
                     while client.is_connected and not self._stop.is_set():
                         await asyncio.sleep(0.2)
+                    try:  # avisar a la Nano para que vuelva a anunciarse de inmediato
+                        await client.stop_notify(CHAR_UUID)
+                    except Exception:
+                        pass
             except Exception as e:
                 print("BLE:", e)
+                await asyncio.sleep(1)
             finally:
                 self._client = None
                 self.connected = False

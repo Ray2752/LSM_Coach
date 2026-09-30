@@ -26,3 +26,4 @@ lsm_coach.db-journal
 # Datos derivados de datasets públicos (se regeneran con import_msl.py)
 samples_public/
 samples_dynamic/
+.lsm_wrist_addr

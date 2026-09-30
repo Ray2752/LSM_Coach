@@ -8,9 +8,13 @@ const char *SERVICE_UUID = "19B10000-E8F2-537E-4F6C-D104768A1214";
 const char *ORIENT_UUID = "19B10001-E8F2-537E-4F6C-D104768A1214";
 const char *VIB_UUID = "19B10002-E8F2-537E-4F6C-D104768A1214";
 
+// Aviso al aprendiz: un LED en D4 (ánodo -> resistencia de 220-330 Ω -> D4; cátodo -> GND).
+// Antes era un motor de vibración; el protocolo con la app es el mismo ("vibrar" = avisar).
 const int VIB_PIN = 4;
 const int VIB_ON = HIGH;
 const unsigned long VIB_MAX_MS = 2000;
+const int ALERT_BLINKS = 3;               // un aviso de la app = 3 parpadeos (se ve mejor que 1)
+const unsigned long BLINK_GAP_MS = 120;
 
 const unsigned long TEST_EVERY_MS = 0;
 const unsigned long TEST_ON_MS = 1000;
@@ -103,7 +107,7 @@ int bleBegin() { return BLE.begin(); }
 void bleEnd() { BLE.end(); }
 
 void onConnected(BLEDevice) {
-  vibratePattern(2, 80, 120);
+  vibratePattern(2, 200, 200);  // 2 parpadeos: la app se conectó
 }
 
 void onDisconnected(BLEDevice) {
@@ -141,13 +145,17 @@ void setup() {
   BLE.setEventHandler(BLEDisconnected, onDisconnected);
   BLE.advertise();
 
-  vibratePattern(1, 150, 0);
+  vibratePattern(1, 600, 0);  // encendido: una luz larga = sensores y Bluetooth listos
 }
 
 void loop() {
   BLE.poll();
 
-  if (vibChar.written()) vibratePattern(1, (unsigned long)vibChar.value() * 10, 0);
+  if (vibChar.written()) {  // la app manda la duración en unidades de 10 ms; se reparte en parpadeos
+    unsigned long total = (unsigned long)vibChar.value() * 10;
+    unsigned long on = constrain(total / ALERT_BLINKS, 80UL, 400UL);
+    vibratePattern(ALERT_BLINKS, on, BLINK_GAP_MS);
+  }
   updateVibration();
 
   float a[3], g[3];
