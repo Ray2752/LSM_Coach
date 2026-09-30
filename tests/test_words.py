@@ -7,7 +7,7 @@ import unittest
 
 import numpy as np
 
-from train_words import face_box, still_word_sample, word_features
+from train_words import IMU_N, face_box, still_word_sample, word_features
 
 
 def clip(n=40, with_face=True):
@@ -48,6 +48,45 @@ class WordFeatureTests(unittest.TestCase):
         feats, angles, wrist, face, ok = clip(30, False)
         v = still_word_sample(feats, angles, wrist, face, ok, np.random.default_rng(1))
         self.assertTrue(np.isfinite(v).all())
+
+
+def glove(n=40, roll=(10.0, 40.0), pitch=(-5.0, -5.0)):
+    """Inclinación del guante durante la seña: roll y pitch en grados, lineales."""
+    return np.stack([np.linspace(*roll, n), np.linspace(*pitch, n)], axis=1).astype(np.float32)
+
+
+class GloveFeatureTests(unittest.TestCase):
+    def test_sin_guante_el_vector_no_cambia(self):
+        a = word_features(*clip(40))
+        b = word_features(*clip(40), imu=glove(40), use_imu=False)
+        np.testing.assert_array_equal(a, b)
+
+    def test_con_guante_se_agregan_rasgos_y_bandera(self):
+        base = word_features(*clip(40))
+        con = word_features(*clip(40), imu=glove(40), use_imu=True)
+        sin = word_features(*clip(40), imu=None, use_imu=True)
+        self.assertEqual(len(con), len(base) + IMU_N)
+        self.assertEqual(len(sin), len(base) + IMU_N)
+        self.assertEqual(con[-1], 1.0)                       # bandera: hubo guante
+        self.assertTrue((sin[-IMU_N:] == 0).all())           # sin guante: ceros y bandera 0
+        self.assertTrue(np.isfinite(con).all())
+        self.assertAlmostEqual(con[-1 - 8 + 3], (40.0 - 10.0) / 90.0, places=5)  # cambio de roll
+
+    def test_lecturas_perdidas_no_rompen(self):
+        imu = glove(40)
+        imu[5:30] = math.nan                                  # el guante se desconectó a mitad
+        v = word_features(*clip(40), imu=imu, use_imu=True)
+        self.assertTrue(np.isfinite(v).all())
+        imu[:] = math.nan                                     # nunca hubo lectura
+        v = word_features(*clip(40), imu=imu, use_imu=True)
+        self.assertEqual(v[-1], 0.0)
+
+    def test_quieta_con_guante_mantiene_la_inclinacion(self):
+        feats, angles, wrist, face, ok = clip(30)
+        v = still_word_sample(feats, angles, wrist, face, ok, np.random.default_rng(1),
+                              imu=glove(30, roll=(20.0, 60.0)), use_imu=True)
+        self.assertEqual(v[-1], 1.0)
+        self.assertLess(abs(v[-1 - 8 + 3]), 0.15)             # casi sin cambio de roll: quieta
 
 
 if __name__ == "__main__":

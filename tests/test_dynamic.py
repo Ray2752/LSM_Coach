@@ -26,6 +26,20 @@ def feed_path(win, xs, fps=30, t0=0.0):
 
 
 class GestureWindowTests(unittest.TestCase):
+    def test_el_segmento_lleva_la_inclinacion_del_guante(self):
+        win = GestureWindow()
+        xs = [0.5] * 10 + list(np.linspace(0.5, 0.9, 25)) + [0.9] * 30
+        segs = []
+        for i, x in enumerate(xs):
+            imu = (10.0 + i, -5.0) if i % 3 else None  # a veces sin lectura
+            seg = win.feed(i / 30, FEATS, ANGLES, (x, 0.5, SIZE), imu=imu)
+            if seg:
+                segs.append(seg)
+        self.assertEqual(len(segs), 1)
+        imu = segs[0]["imu"]
+        self.assertEqual(imu.shape, (len(segs[0]["ok"]), 2))
+        self.assertTrue(np.isnan(imu).any() and np.isfinite(imu).any())  # huecos como NaN
+
     def test_quieta_no_produce_trazo(self):
         win = GestureWindow()
         self.assertEqual(feed_path(win, [0.5] * 90), [])

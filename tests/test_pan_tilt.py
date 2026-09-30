@@ -9,7 +9,8 @@ import unittest
 
 import pan_tilt
 import pan_tilt_server
-from pan_tilt import DEADBAND, MAX_STEP, PAN_CENTER, PAN_RANGE, PAN_SIGN, TILT_CENTER, UPDATE_S, NetClient, Tracker
+from pan_tilt import (DEADBAND, EDGE, MAX_STEP, PAN_CENTER, PAN_RANGE, PAN_SIGN, TILT_CENTER, UPDATE_S,
+                      NetClient, Tracker)
 
 
 class TrackerTests(unittest.TestCase):
@@ -36,8 +37,12 @@ class TrackerTests(unittest.TestCase):
         self.assertEqual(pan - PAN_CENTER, PAN_SIGN * MAX_STEP)  # paso limitado, con el signo del eje
 
     def test_no_mueve_mientras_se_evalua_un_trazo(self):
-        self.assertFalse(self.tr.update((0.9, 0.5, .2, .25), now=10.0, busy=True))
+        # ocupado (grabando/evaluando un trazo): no se mueve mientras la mano siga en la zona central...
+        self.assertFalse(self.tr.update((0.5 + EDGE * .8, 0.5, .2, .25), now=10.0, busy=True))
         self.assertEqual(self.sent, [])
+        # ...pero sí si está por salirse de la imagen (más allá de EDGE): mejor perder el trazo que la mano
+        self.assertTrue(self.tr.update((0.9, 0.5, .2, .25), now=11.0, busy=True))
+        self.assertEqual(len(self.sent), 1)
 
     def test_respeta_la_frecuencia_de_actualizacion(self):
         self.assertTrue(self.tr.update((0.9, 0.5, .2, .25), now=10.0))

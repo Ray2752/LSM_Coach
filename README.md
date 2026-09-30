@@ -176,7 +176,11 @@ pecho, espacio neutro) y movimiento. No hay dataset público de LSM con ellas: h
      mismo video por el movimiento de la muñeca e imprime los segundos de cada una; sin él,
      cada clip es una ejecución. `--person` debe ser la persona o la fuente: así la medición
      deja fuera a cada una.
-2. `python train_words.py` → `model_words.joblib`. Cada ejecución se añade también recortada
+   Con el **guante conectado**, cada muestra guarda además la inclinación de la muñeca (roll y
+   pitch del giroscopio) fotograma a fotograma; el aviso "guardada … con guante" lo confirma.
+2. `python train_words.py` → `model_words.joblib`. Si hay muestras con guante, el modelo usa
+   también la curva de inclinación (cada muestra entra con y sin guante, para que siga
+   funcionando si el guante se desconecta; `--sin-guante` lo desactiva). Cada ejecución se añade también recortada
    al inicio y al final (el detector en vivo no corta igual que al extraer: con esto POR FAVOR
    de una fuente nueva pasó de 0-40 % a 75 %) y se omiten las que la app rechazaría por poco
    recorrido. Mide dejando fuera a cada persona/fuente (solo vale para las palabras con 2+) y

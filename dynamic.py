@@ -50,10 +50,11 @@ class GestureWindow:
     def elapsed(self):
         return (self.buf[-1][0] - self.start_t) if self.active and self.buf else 0.0
 
-    def feed(self, t, feats, angles, wrist, face=None):
+    def feed(self, t, feats, angles, wrist, face=None, imu=None):
         """wrist: (x, y, tamaño) en coordenadas de imagen (0-1). face: (cx, cy, ancho, alto)
         del rostro en la imagen o None (para las palabras: ubicación respecto al cuerpo).
-        Devuelve el segmento terminado ({feats, angles, wrist, face, ok, duration}) o None."""
+        imu: (roll, pitch) del guante en grados o None (sin guante / sin lectura).
+        Devuelve el segmento terminado ({feats, angles, wrist, face, imu, ok, duration}) o None."""
         if self._pos is None:
             self._pos = (wrist[0], wrist[1])
         else:
@@ -66,7 +67,7 @@ class GestureWindow:
             size = max(wrist[2], 1e-3)
             v = math.hypot(wrist[0] - w0[0], wrist[1] - w0[1]) / size / dt
             self._speed = 0.5 * self._speed + 0.5 * v  # suavizado
-        self.buf.append((t, feats, angles, wrist, face))
+        self.buf.append((t, feats, angles, wrist, face, imu))
         while self.buf and t - self.buf[0][0] > MAX_S + PRE_S + 0.5:
             self.buf.popleft()
 
@@ -95,11 +96,12 @@ class GestureWindow:
         self.active, self._fast, self._still_since = False, 0, None
         if len(rows) < 6 or rows[-1][0] - rows[0][0] < MIN_S:
             return None
-        nan4 = (math.nan,) * 4
+        nan4, nan2 = (math.nan,) * 4, (math.nan,) * 2
         return {"feats": np.array([r[1] for r in rows], dtype=np.float32),
                 "angles": np.array([r[2] for r in rows], dtype=np.float32),
                 "wrist": np.array([r[3] for r in rows], dtype=np.float32),
                 "face": np.array([r[4] if r[4] is not None else nan4 for r in rows], dtype=np.float32),
+                "imu": np.array([r[5] if r[5] is not None else nan2 for r in rows], dtype=np.float32),
                 "ok": np.ones(len(rows), dtype=np.int8),
                 "duration": round(rows[-1][0] - rows[0][0], 2)}
 
@@ -125,8 +127,10 @@ def classify(bundle, segment):
         return STILL, 1.0
     if bundle.get("kind") == "words":  # señas de palabras: además, ubicación respecto al rostro
         from train_words import word_features
+        # y, si el modelo se entrenó con guante ("imu" en el paquete), la inclinación de la muñeca
         x = word_features(segment["feats"], segment["angles"], segment["wrist"],
-                          segment.get("face"), segment["ok"])
+                          segment.get("face"), segment["ok"], imu=segment.get("imu"),
+                          use_imu=bool(bundle.get("imu")))
     else:
         from train_dynamic import sequence_features
         x = sequence_features(segment["feats"], segment["angles"], segment["wrist"], segment["ok"])

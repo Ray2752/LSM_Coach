@@ -173,7 +173,7 @@ class Coach:
                             "imu": dict(imu) if imu else None}
 
         if self._bundle() is not None or self._record_word:  # letra con movimiento o palabra
-            return self._process_dynamic(state, now, features, raw, lm, state["handedness"])
+            return self._process_dynamic(state, now, features, raw, lm, state["handedness"], imu)
 
         if tol is None:
             state["verdict"] = "uncalibrated"
@@ -275,7 +275,7 @@ class Coach:
         name = f"{person}-live-{n:03d}"
         np.savez_compressed(os.path.join(DATA_DIR, word, f"{name}.npz"), feats=segment["feats"],
                             angles=segment["angles"], wrist=segment["wrist"], face=segment["face"],
-                            ok=segment["ok"])
+                            imu=segment["imu"], ok=segment["ok"])
         index = os.path.join(DATA_DIR, "index.csv")
         new = not os.path.exists(index)
         with open(index, "a", newline="", encoding="utf-8") as f:
@@ -287,7 +287,7 @@ class Coach:
                         "face_frames": int(np.isfinite(segment["face"][:, 2]).sum())})
         return n + 1
 
-    def _process_dynamic(self, state, now, features, raw, lm, handedness):
+    def _process_dynamic(self, state, now, features, raw, lm, handedness, imu=None):
         """Letras con movimiento y palabras: acumula el trazo de la muñeca y lo clasifica (o lo
         guarda como muestra) cuando la mano se detiene. Veredictos: ready, moving, ok / fix."""
         state["calibrated"] = self._bundle() is not None
@@ -296,7 +296,10 @@ class Coach:
         x = 1.0 - w.x if handedness == "Left" else w.x  # mano izquierda: reflejada, como los landmarks
         angles = [raw[f] for f in ("pulgar", "indice", "medio", "anular", "menique")]
         face = self._face if self.target in WORDS else None
-        segment = self.gesture.feed(now, features, angles, (x, w.y, size), face)
+        # inclinación del guante por fotograma (palabras): se guarda con la muestra y, si el
+        # modelo se entrenó con guante, entra en la clasificación
+        tilt = (imu["roll"], imu["pitch"]) if imu and imu.get("roll") is not None else None
+        segment = self.gesture.feed(now, features, angles, (x, w.y, size), face, imu=tilt)
         alert, achievement = self._classify_segment(segment, now)
         self._dyn_state(state, now)
         return state, alert, achievement
@@ -309,7 +312,9 @@ class Coach:
             n = self._save_word_sample(segment)
             self._record_word = None
             if self.notify:
-                self.notify(f"Seña de {self.target} guardada ({n} en total, {segment['duration']} s)")
+                glove = int(np.isfinite(segment["imu"]).all(axis=1).sum()) >= 4
+                self.notify(f"Seña de {self.target} guardada ({n} en total, {segment['duration']} s, "
+                            f"{'con' if glove else 'sin'} guante)")
             self._dyn_result = None
             return False, None
         bundle = self._bundle()
