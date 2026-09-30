@@ -1,30 +1,3 @@
-"""Seguimiento de la persona con la cámara motorizada (UNO Q + 2 servos SG90).
-
-La visión detecta el rostro; aquí se decide hacia dónde girar la cámara para mantenerlo
-centrado y se manda "aim(pan, tilt)" a la MCU de la UNO Q, que mueve los servos
-(uno_q/pan_tilt/sketch.ino). La orden llega a la MCU por el arduino-router: un socket Unix
-con MessagePack-RPC en /var/run/arduino-router.sock, así que no depende del Python de App Lab.
-
-Dos formas de llegar al router:
-  - RouterClient: la visión corre en la propia UNO Q.
-  - NetClient: la visión corre en otra placa (Raspberry Pi 5). Manda las mismas órdenes por
-    UDP a la UNO Q, donde `pan_tilt_server.py` (uno_q/servos.sh) las pasa al router. La UNO Q
-    se anuncia por difusión cada segundo, así que la Pi la encuentra sola (`discover`).
-
-Reglas del seguimiento (Tracker):
-  - control proporcional con zona muerta: si el rostro está cerca del centro, no se mueve
-  - pasos limitados: la cámara gira despacio para que la imagen no brinque
-  - NO se mueve mientras se está grabando/evaluando un trazo (moverla alteraría la trayectoria)
-  - sin rostro un rato, se queda quieta (no "busca")
-
-Pruebas del hardware, en la UNO Q:
-    python pan_tilt.py --centrar
-    python pan_tilt.py --barrido       # recorre pan y tilt para ver que se mueven
-    python pan_tilt.py --apuntar 60 100
-Desde la Pi (con uno_q/servos.sh corriendo en la UNO Q):
-    python pan_tilt.py --red --barrido            # encuentra la UNO Q sola
-    python pan_tilt.py --red 172.20.10.9 --barrido
-"""
 import argparse
 import json
 import os
@@ -34,32 +7,25 @@ import threading
 import time
 
 SOCKET_PATH = "/var/run/arduino-router.sock"
-NET_PORT = 8765        # UDP: órdenes de la Pi a la UNO Q (pan_tilt_server.py)
-DISCOVER_PORT = 8766   # UDP: la UNO Q anuncia "aquí estoy" por difusión cada segundo
+NET_PORT = 8765
+DISCOVER_PORT = 8766
 
-# --- Ajustes del seguimiento -----------------------------------------------------------
 PAN_CENTER, TILT_CENTER = 90, 90
 PAN_RANGE, TILT_RANGE = (15, 165), (40, 140)
-DEADBAND = 0.12     # fracción de la imagen: dentro de esta zona alrededor del centro no se mueve
-                    # (la mano se mueve mucho al señar: con menos, la cámara la persigue sin parar)
-GAIN = 40.0         # grados por unidad de error (error = desplazamiento del rostro, -0.5..0.5)
-MAX_STEP = 4.0      # grados como máximo por actualización
-UPDATE_S = 0.2      # actualizaciones por segundo (5 Hz)
-FACE_TIMEOUT_S = 1.0  # sin rostro más reciente que esto, no se mueve
-# Signo de cada eje: depende de cómo esté montado el servo y de que la imagen va en espejo.
-# Si la cámara "huye" de la persona en vez de seguirla, cambiar el signo de ese eje.
-PAN_SIGN, TILT_SIGN = -1, -1  # tilt -1: con el soporte de la demo (30-sep), +1 subía al bajar la mano
-# Ejes en uso. El servo de pan (abajo, D9) dejó de funcionar el 30-sep y la demo va solo con
-# el de tilt (arriba/abajo): el pan se queda centrado. Poner True cuando se reemplace.
-PAN_ENABLED = False
-# ---------------------------------------------------------------------------------------
+DEADBAND = 0.12
+EDGE = 0.35
+GAIN = 40.0
+MAX_STEP = 4.0
+UPDATE_S = 0.2
+FACE_TIMEOUT_S = 1.0
+HAND_TIMEOUT_S = 1.0
+PAN_SIGN, TILT_SIGN = -1, -1
+PAN_ENABLED = True
 
 
 class RouterClient:
-    """Cliente mínimo de MessagePack-RPC para el arduino-router (Linux <-> MCU)."""
-
     def __init__(self, path=SOCKET_PATH):
-        import msgpack  # solo hace falta en la UNO Q: pip install msgpack
+        import msgpack
         self.msgpack = msgpack
         self.path = path
         self.sock = None
@@ -93,7 +59,7 @@ class RouterClient:
                 break
             unpacker.feed(data)
             for msg in unpacker:
-                if isinstance(msg, (list, tuple)) and len(msg) == 4 and msg[0] == 1:  # RESPONSE
+                if isinstance(msg, (list, tuple)) and len(msg) == 4 and msg[0] == 1:
                     ev = self._pending.get(msg[1])
                     if ev:
                         ev["error"], ev["result"] = msg[2], msg[3]
@@ -101,7 +67,6 @@ class RouterClient:
         self.connected = False
 
     def notify(self, method, *args):
-        """Orden sin respuesta (lo más rápido: ~1 ms)."""
         if not self.connected:
             return False
         try:
@@ -113,7 +78,6 @@ class RouterClient:
             return False
 
     def call(self, method, *args, timeout=2.0):
-        """Llamada con respuesta. Devuelve el resultado o None si falla."""
         if not self.connected:
             return None
         with self._lock:
@@ -142,7 +106,6 @@ class RouterClient:
 
 
 def discover(timeout=5.0, port=DISCOVER_PORT):
-    """IP de la UNO Q que corre pan_tilt_server.py, escuchando sus anuncios; None si no hay."""
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     try:
@@ -164,10 +127,6 @@ def discover(timeout=5.0, port=DISCOVER_PORT):
 
 
 class NetClient:
-    """Mismas órdenes que RouterClient (aim/center/status) pero por UDP a la UNO Q, para cuando
-    la visión corre en otra placa. Cada datagrama es JSON: {"m": "aim", "a": [pan, tilt]};
-    con "id" se espera respuesta {"id": ..., "r": resultado}."""
-
     def __init__(self, host="auto", port=NET_PORT):
         self.host, self.port = host, port
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -229,13 +188,7 @@ class NetClient:
             pass
 
 
-HAND_TIMEOUT_S = 1.0  # sin mano más reciente que esto, se sigue el rostro
-
-
 def target_point(hand, hand_t, face, face_t, now):
-    """Qué punto (x, y en 0-1) centrar con la cámara: la **mano** (es lo que se evalúa y lo que
-    el usuario pidió seguir). Sin mano reciente, el rostro, para tener a la persona encuadrada
-    cuando levante la mano. None si no se ve nada."""
     if hand is not None and now - hand_t < HAND_TIMEOUT_S:
         return (hand[0], hand[1])
     if face is not None and now - face_t < FACE_TIMEOUT_S:
@@ -244,10 +197,6 @@ def target_point(hand, hand_t, face, face_t, now):
 
 
 class Tracker:
-    """Decide pan/tilt a partir de la posición del punto a seguir (mano o rostro, ver
-    target_point). `send(pan, tilt)` se llama solo cuando hay que mover; se inyecta para
-    poder probarlo sin hardware."""
-
     def __init__(self, send, pan_enabled=None):
         self.send = send
         self.pan_enabled = PAN_ENABLED if pan_enabled is None else pan_enabled
@@ -256,14 +205,14 @@ class Tracker:
         self.moves = 0
 
     def update(self, face, now, busy=False, face_t=None):
-        """face: (cx, cy, w, h) del rostro en la imagen (0-1) o None. busy: no mover
-        (se está grabando o evaluando un trazo). Devuelve True si mandó un movimiento."""
-        if busy or face is None or now - self._last_update < UPDATE_S:
+        if face is None or now - self._last_update < UPDATE_S:
             return False
         if face_t is not None and now - face_t > FACE_TIMEOUT_S:
             return False
+        ex, ey = face[0] - 0.5, face[1] - 0.5
+        if busy and max(abs(ex), abs(ey)) < EDGE:
+            return False
         self._last_update = now
-        ex, ey = face[0] - 0.5, face[1] - 0.5  # + = punto a la derecha / abajo de la imagen
         dpan = 0.0 if (abs(ex) < DEADBAND or not self.pan_enabled) else max(-MAX_STEP, min(MAX_STEP, PAN_SIGN * GAIN * ex))
         dtilt = 0.0 if abs(ey) < DEADBAND else max(-MAX_STEP, min(MAX_STEP, TILT_SIGN * GAIN * ey))
         if dpan == 0.0 and dtilt == 0.0:
@@ -280,8 +229,6 @@ class Tracker:
 
 
 def make_client(remote="auto"):
-    """Cliente hacia los servos: el router local si esta placa es la UNO Q, si no la UNO Q por
-    red (remote = "auto" para encontrarla sola, o su IP). None si no hay forma de llegar."""
     if remote in (None, "auto", "local") and os.path.exists(SOCKET_PATH):
         try:
             client = RouterClient()
@@ -297,7 +244,6 @@ def make_client(remote="auto"):
 
 
 def make_tracker(remote="auto"):
-    """Tracker conectado a los servos (ver make_client), o None si no hay servos."""
     client = make_client(remote)
     if client is None:
         return None
@@ -308,8 +254,6 @@ def make_tracker(remote="auto"):
 
 
 def track_test(client, seconds=40):
-    """Prueba de todo el lazo sin la interfaz: cámara -> mano/rostro -> Tracker -> servos.
-    Imprime cada medio segundo qué ve y qué manda. Cerrar antes la app (usa la cámara)."""
     import cv2
     import mediapipe as mp
     from web_server import Camera
@@ -354,7 +298,7 @@ def track_test(client, seconds=40):
 
 
 def main():
-    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap = argparse.ArgumentParser(description="Cámara motorizada de LSM Coach (UNO Q + 2 servos)")
     ap.add_argument("--centrar", action="store_true")
     ap.add_argument("--barrido", action="store_true")
     ap.add_argument("--apuntar", nargs=2, type=int, metavar=("PAN", "TILT"))
