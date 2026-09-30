@@ -60,9 +60,13 @@ class AlertPolicy:
 
 class Coach:
     def __init__(self, tolerances, target=NIVEL_1[0], require_imu=True, model=None, dyn_model=None,
-                 word_model=None, hands_complexity=1):
+                 word_model=None, hands_complexity=1, classify_every=1):
         self.tolerances = tolerances
         self.require_imu = require_imu
+        # En la UNO Q el bosque tarda ~50 ms: clasificar cada N fotogramas y reutilizar la última
+        # probabilidad (ya se promedian los últimos SMOOTH_FRAMES, así que no cambia el veredicto)
+        self.classify_every = max(1, int(classify_every))
+        self._classify_i = 0
         self.model = model        # clasificador de landmarks (opcional)
         self.dyn_model = dyn_model  # clasificador de trazos para J, K, Ñ, Q, X, Z (opcional)
         self.word_model = word_model  # señas de palabras del Nivel 3 (opcional)
@@ -348,7 +352,11 @@ class Coach:
         """Probabilidades del clasificador promediadas en los últimos fotogramas."""
         if self.model is None:
             return None
-        self.proba_hist.append(self.model.predict_proba([features])[0])
+        self._classify_i += 1
+        if self._classify_i % self.classify_every == 0 or not self.proba_hist:
+            self.proba_hist.append(self.model.predict_proba([features])[0])
+        else:
+            self.proba_hist.append(self.proba_hist[-1])  # fotograma intermedio: repite la última
         n = len(self.proba_hist)
         return {str(c): sum(p[i] for p in self.proba_hist) / n
                 for i, c in enumerate(self.model.classes_)}

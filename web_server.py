@@ -162,7 +162,8 @@ class Runtime:
         self.coach = Coach(self.tolerances, target=args.sign, require_imu=args.imu != "none",
                            model=load_model(), dyn_model=load_dynamic_model(),
                            word_model=load_word_model(),
-                           hands_complexity=0 if getattr(args, "modelo_ligero", False) else 1)
+                           hands_complexity=0 if getattr(args, "modelo_ligero", False) else 1,
+                           classify_every=2 if getattr(args, "lite", False) else 1)
         self.coach.notify = self.notify
         self.tracker = None
         if args.seguir:  # cámara motorizada (UNO Q + servos): sigue el rostro de la persona

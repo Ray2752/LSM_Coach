@@ -29,7 +29,7 @@ for arg in "$@"; do
   case "$arg" in
     --sin-guante) IMU="none" ;;
     --seguir) EXTRA="$EXTRA --seguir" ;;   # cámara motorizada (servos en D9/D10, uno_q/pan_tilt)
-    --modelo-ligero) EXTRA="$EXTRA --modelo-ligero" ;;   # manos con el modelo ligero (más fps)
+    --modelo-ligero) ;;                    # ya va por defecto (ver abajo)
     --res=*) RES="${arg#--res=}" ;;        # p. ej. --res=480x360
   esac
 done
@@ -53,7 +53,8 @@ command -v xset >/dev/null 2>&1 && xset s off -dpms 2>/dev/null
 # --cam auto: la cámara USB cambia de /dev/videoN entre reinicios. 640x480 alivia al procesador.
 # --lite: video MJPEG más ligero e interfaz sin efectos (el navegador de la UNO Q no tiene GPU).
 # shellcheck disable=SC2086
-python web_server.py --cam auto --res "${RES:-640x480}" --imu "$IMU" --lite $EXTRA &
+# --modelo-ligero: manos con el modelo ligero de MediaPipe (97 ms vs 162 ms por fotograma en la UNO Q)
+python web_server.py --cam auto --res "${RES:-640x480}" --imu "$IMU" --lite --modelo-ligero $EXTRA &
 SERVER=$!
 
 # espera a que el servidor responda (máx. 60 s: MediaPipe tarda en cargar la primera vez)
