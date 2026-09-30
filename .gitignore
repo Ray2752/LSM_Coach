@@ -27,3 +27,6 @@ lsm_coach.db-journal
 samples_public/
 samples_dynamic/
 .lsm_wrist_addr
+
+# Videos de terceros para entrenar palabras (no se publican)
+videos_palabras/

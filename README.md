@@ -183,18 +183,22 @@ Referencias opcionales: `web/ref/words/<PALABRA>.gif` (POR_FAVOR con guion bajo)
 
 ## Cámara motorizada (UNO Q + 2 servos SG90)
 
-La cámara va en un soporte pan/tilt y sigue el rostro de la persona. La visión (Linux de la
-UNO Q) decide hacia dónde mirar y la MCU (STM32) mueve los servos suavemente.
+La cámara va en un soporte pan/tilt y sigue el rostro de la persona. La visión decide hacia
+dónde mirar y la MCU (STM32) de la UNO Q mueve los servos suavemente.
 
 - **Sketch de la MCU:** `uno_q/pan_tilt/sketch.ino`. Se carga desde Arduino App Lab: nueva
   App, pegar el sketch, añadir las librerías **Servo (≥ 1.3.0)** y **Arduino_RouterBridge**,
   Run. Expone `aim(pan, tilt)`, `center()` y `status()` por el Bridge.
 - **Cableado:** señal pan → D9, tilt → D10; +5 V de los servos desde el power bank/elevador
   (no del pin 5 V de la placa), GND común.
-- **Linux:** `pan_tilt.py` habla con el `arduino-router` por su socket Unix
+- **Linux de la UNO Q:** `pan_tilt.py` habla con el `arduino-router` por su socket Unix
   (`/var/run/arduino-router.sock`, MessagePack-RPC; `pip install msgpack`). Probar los servos:
-  `python pan_tilt.py --barrido`. Arrancar la app con seguimiento: `run.sh --seguir` (o
-  `web_server.py --seguir`).
+  `python pan_tilt.py --barrido`. Si la visión corre en la propia UNO Q: `run.sh --seguir`.
+- **Visión en la Raspberry Pi:** en la UNO Q corre el puente `bash uno_q/servos.sh`
+  (`pan_tilt_server.py`: recibe las órdenes por UDP en el puerto 8765 y se anuncia por
+  difusión en el 8766; `--instalar-servicio` lo deja arrancando solo). En la Pi,
+  `run.sh --seguir` encuentra la UNO Q sola en la red del hotspot, o `--seguir=IP`.
+  Probar desde la Pi: `python pan_tilt.py --red --barrido`.
 - **Comportamiento:** control proporcional con zona muerta y pasos de ≤ 4° a 5 Hz; no se mueve
   mientras se graba o evalúa un trazo ni si no ve el rostro. Si la cámara "huye" de la persona,
   cambiar `PAN_SIGN`/`TILT_SIGN` en `pan_tilt.py` (depende del montaje y del espejo).

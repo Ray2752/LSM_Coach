@@ -5,7 +5,8 @@
 #
 #   bash ~/LSM_Coach/uno_q/run.sh                       # demo
 #   bash ~/LSM_Coach/uno_q/run.sh --sin-guante          # pruebas sin la muñequera
-#   bash ~/LSM_Coach/uno_q/run.sh --seguir              # con la cámara motorizada (servos, solo UNO Q)
+#   bash ~/LSM_Coach/uno_q/run.sh --seguir              # cámara motorizada (servos en la UNO Q; desde la Pi
+#                                                       #   la busca en la red, o --seguir=172.20.10.9)
 #   bash ~/LSM_Coach/uno_q/run.sh --instalar-autostart  # que arranque sola al encender
 #   bash ~/LSM_Coach/uno_q/run.sh --modelo-ligero       # en la Pi: manos con el modelo ligero (más fps)
 #   bash ~/LSM_Coach/uno_q/run.sh --ligero --res=480x360   # en la Pi: forzar el modo de la UNO Q
@@ -19,9 +20,9 @@ IMU="ble"
 # Raspberry Pi 5: 3-4 veces más rápida que la UNO Q y con GPU en el navegador: va sin modo ligero
 # y con el modelo completo de manos (más preciso). En la UNO Q, 480x360 + ligero dan ~7 fps.
 if grep -qi "raspberry pi" /proc/device-tree/model 2>/dev/null; then
-  RES="640x480"; LITE=""; MODEL=""
+  PLACA="pi"; RES="640x480"; LITE=""; MODEL=""
 else
-  RES="480x360"; LITE="--lite"; MODEL="--modelo-ligero"
+  PLACA="unoq"; RES="480x360"; LITE="--lite"; MODEL="--modelo-ligero"
 fi
 
 if [ "${1:-}" = "--instalar-autostart" ]; then
@@ -38,15 +39,18 @@ EOF
   echo "Listo: LSM Coach arrancará al iniciar sesión. Para quitarlo: rm ~/.config/autostart/lsm-coach.desktop"
   exit 0
 fi
-EXTRA=""
+EXTRA=""; WANT=""
 for arg in "$@"; do
   case "$arg" in
     --sin-guante) IMU="none" ;;
-    --seguir) EXTRA="$EXTRA --seguir" ;;   # cámara motorizada (servos en D9/D10, uno_q/pan_tilt)
+    --seguir) EXTRA="$EXTRA --seguir" ;;   # cámara motorizada (servos en la UNO Q, uno_q/pan_tilt)
+    --seguir=*) EXTRA="$EXTRA --seguir ${arg#--seguir=}" ;;   # desde la Pi, con la IP de la UNO Q
     --ligero) LITE="--lite" ;;             # video e interfaz ligeros (navegador sin GPU)
     --modelo-ligero) MODEL="--modelo-ligero" ;;   # MediaPipe complexity 0 (97 ms vs 162 ms en la UNO Q)
     --completo) LITE=""; MODEL="" ;;
     --res=*) RES="${arg#--res=}" ;;        # p. ej. --res=480x360
+    --firefox) WANT="firefox" ;;           # fuerza el navegador
+    --chromium) WANT="chromium" ;;
   esac
 done
 
@@ -85,13 +89,22 @@ done
 
 PAGE="$URL/"
 [ -n "$LITE" ] && PAGE="$URL/?lite=1"
-BROWSER=$(command -v chromium || command -v chromium-browser || command -v firefox-esr || command -v firefox)
-# nice: la visión (MediaPipe) tiene prioridad sobre el navegador. Las banderas de GPU usan la
-# aceleración si existe (Pi 5: sí; UNO Q: cae a software sin fallar). ozone auto: Wayland o X11.
+FIREFOX=$(command -v firefox || command -v firefox-esr || true)
+CHROMIUM=$(command -v chromium || command -v chromium-browser || true)
+# En la Raspberry Pi 5 (30-sep) Chromium no cargaba ninguna página con su GPU: si hay Firefox
+# se usa ese y, si no, Chromium sin GPU. En la UNO Q, Chromium con sus banderas de GPU.
+if [ "$WANT" = "firefox" ] || { [ -z "$WANT" ] && [ "$PLACA" = "pi" ] && [ -n "$FIREFOX" ]; }; then
+  BROWSER="$FIREFOX"
+else
+  BROWSER="${CHROMIUM:-$FIREFOX}"
+fi
+[ -n "$BROWSER" ] || { echo "No hay navegador (instala firefox o chromium)"; kill $SERVER; exit 1; }
+# nice: la visión (MediaPipe) tiene prioridad sobre el navegador.
 if [[ "$BROWSER" == *chromium* ]]; then
+  if [ "$PLACA" = "pi" ]; then GPU="--disable-gpu"; else GPU="--ignore-gpu-blocklist --enable-gpu-rasterization --enable-zero-copy"; fi
+  # shellcheck disable=SC2086
   nice -n 5 "$BROWSER" --kiosk --noerrdialogs --disable-infobars --no-first-run --disable-session-crashed-bubble \
-             --autoplay-policy=no-user-gesture-required --ignore-gpu-blocklist --enable-gpu-rasterization \
-             --enable-zero-copy --disable-smooth-scrolling --ozone-platform-hint=auto "$PAGE"
+             --autoplay-policy=no-user-gesture-required --disable-smooth-scrolling $GPU "$PAGE"
 else
   nice -n 5 "$BROWSER" --kiosk "$PAGE"
 fi

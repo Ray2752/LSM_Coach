@@ -159,8 +159,10 @@ def main():
                 n = len(glob.glob(os.path.join(DATA_DIR, word, "*.npz")))
                 save_segment(seg, word, person, os.path.splitext(os.path.basename(path))[0][:20], writer, n)
             faces = sum(r[4] is not None for r in rows)
+            times = ", ".join(f"{s[0][0]:.1f}-{s[-1][0]:.1f}s" for s in segs if len(s) >= 6)
             print(f"{os.path.basename(path):32s} {word:10s} mano en {len(rows)} fotogramas, rostro en {faces}, "
-                  f"{len(segs)} ejecución(es)" + ("" if faces else "  <- sin rostro: ubicación aproximada"))
+                  f"{len(segs)} ejecución(es)" + (f" [{times}]" if args.auto and times else "")
+                  + ("" if faces else "  <- sin rostro: ubicación aproximada"))
             f.flush()
     finally:
         f.close()

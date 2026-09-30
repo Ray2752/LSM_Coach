@@ -222,9 +222,9 @@ class Runtime:
                            classify_every=2 if getattr(args, "lite", False) else 1)
         self.coach.notify = self.notify
         self.tracker = None
-        if args.seguir:  # cámara motorizada (UNO Q + servos): sigue el rostro de la persona
+        if args.seguir:  # cámara motorizada (servos en la UNO Q): sigue el rostro de la persona
             from pan_tilt import make_tracker
-            self.tracker = make_tracker()
+            self.tracker = make_tracker(args.seguir)  # "auto": router local o la UNO Q por red
             self.coach.track_face = self.tracker is not None
         self.imu = {"mock": MockIMU, "ble": BLEIMU}.get(args.imu, lambda: None)()
         if self.imu:
@@ -547,8 +547,9 @@ def main():
                     help="UNO Q: video MJPEG más ligero (calidad 55, 12 fps) e interfaz sin efectos")
     ap.add_argument("--modelo-ligero", action="store_true",
                     help="modelo ligero de manos de MediaPipe (~2x más rápido; ver uno_q/bench.py)")
-    ap.add_argument("--seguir", action="store_true",
-                    help="cámara motorizada (UNO Q + servos, uno_q/pan_tilt): sigue el rostro de la persona")
+    ap.add_argument("--seguir", nargs="?", const="auto", metavar="IP",
+                    help="cámara motorizada (servos en la UNO Q, uno_q/pan_tilt): sigue el rostro. Sin valor "
+                         "usa el router local (UNO Q) o busca la UNO Q en la red (Pi); o su IP")
     ap.add_argument("--list-cams", action="store_true", help="muestra las cámaras y sale")
     args = ap.parse_args()
     if args.list_cams:

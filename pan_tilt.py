@@ -1,9 +1,15 @@
 """Seguimiento de la persona con la cámara motorizada (UNO Q + 2 servos SG90).
 
-La visión (Linux de la UNO Q) detecta el rostro; aquí se decide hacia dónde girar la cámara
-para mantenerlo centrado y se manda "aim(pan, tilt)" a la MCU, que mueve los servos
-(uno_q/pan_tilt/sketch.ino). La orden va por el arduino-router: un socket Unix con
-MessagePack-RPC en /var/run/arduino-router.sock, así que no depende del Python de App Lab.
+La visión detecta el rostro; aquí se decide hacia dónde girar la cámara para mantenerlo
+centrado y se manda "aim(pan, tilt)" a la MCU de la UNO Q, que mueve los servos
+(uno_q/pan_tilt/sketch.ino). La orden llega a la MCU por el arduino-router: un socket Unix
+con MessagePack-RPC en /var/run/arduino-router.sock, así que no depende del Python de App Lab.
+
+Dos formas de llegar al router:
+  - RouterClient: la visión corre en la propia UNO Q.
+  - NetClient: la visión corre en otra placa (Raspberry Pi 5). Manda las mismas órdenes por
+    UDP a la UNO Q, donde `pan_tilt_server.py` (uno_q/servos.sh) las pasa al router. La UNO Q
+    se anuncia por difusión cada segundo, así que la Pi la encuentra sola (`discover`).
 
 Reglas del seguimiento (Tracker):
   - control proporcional con zona muerta: si el rostro está cerca del centro, no se mueve
@@ -15,14 +21,21 @@ Pruebas del hardware, en la UNO Q:
     python pan_tilt.py --centrar
     python pan_tilt.py --barrido       # recorre pan y tilt para ver que se mueven
     python pan_tilt.py --apuntar 60 100
+Desde la Pi (con uno_q/servos.sh corriendo en la UNO Q):
+    python pan_tilt.py --red --barrido            # encuentra la UNO Q sola
+    python pan_tilt.py --red 172.20.10.9 --barrido
 """
 import argparse
+import json
+import os
 import socket
 import sys
 import threading
 import time
 
 SOCKET_PATH = "/var/run/arduino-router.sock"
+NET_PORT = 8765        # UDP: órdenes de la Pi a la UNO Q (pan_tilt_server.py)
+DISCOVER_PORT = 8766   # UDP: la UNO Q anuncia "aquí estoy" por difusión cada segundo
 
 # --- Ajustes del seguimiento -----------------------------------------------------------
 PAN_CENTER, TILT_CENTER = 90, 90
@@ -124,6 +137,94 @@ class RouterClient:
             pass
 
 
+def discover(timeout=5.0, port=DISCOVER_PORT):
+    """IP de la UNO Q que corre pan_tilt_server.py, escuchando sus anuncios; None si no hay."""
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    try:
+        sock.bind(("", port))
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            sock.settimeout(max(0.1, deadline - time.time()))
+            try:
+                data, addr = sock.recvfrom(256)
+                if json.loads(data.decode()).get("lsm") == "pan_tilt":
+                    return addr[0]
+            except (OSError, ValueError):
+                continue
+    except OSError as e:
+        print(f"No se pudo escuchar los anuncios de la UNO Q ({e}).", file=sys.stderr)
+    finally:
+        sock.close()
+    return None
+
+
+class NetClient:
+    """Mismas órdenes que RouterClient (aim/center/status) pero por UDP a la UNO Q, para cuando
+    la visión corre en otra placa. Cada datagrama es JSON: {"m": "aim", "a": [pan, tilt]};
+    con "id" se espera respuesta {"id": ..., "r": resultado}."""
+
+    def __init__(self, host="auto", port=NET_PORT):
+        self.host, self.port = host, port
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self._id = 0
+        self._lock = threading.Lock()
+        self.connected = False
+
+    def connect(self, timeout=5.0):
+        if self.host == "auto":
+            self.host = discover(timeout)
+            if not self.host:
+                print("No se encontró la UNO Q en la red (¿corre uno_q/servos.sh?); la cámara no se moverá.",
+                      file=sys.stderr)
+                return False
+        self.connected = True
+        status = self.call("status")
+        if status is None:
+            self.connected = False
+            print(f"La UNO Q en {self.host} no responde a los servos; la cámara no se moverá.", file=sys.stderr)
+            return False
+        print(f"Cámara motorizada: UNO Q en {self.host} (servos en {status}).")
+        return True
+
+    def notify(self, method, *args):
+        if not self.connected:
+            return False
+        try:
+            self.sock.sendto(json.dumps({"m": method, "a": list(args)}).encode(), (self.host, self.port))
+            return True
+        except OSError:
+            return False
+
+    def call(self, method, *args, timeout=2.0):
+        if not self.connected:
+            return None
+        with self._lock:
+            self._id += 1
+            msgid = self._id
+            try:
+                self.sock.sendto(json.dumps({"m": method, "a": list(args), "id": msgid}).encode(),
+                                 (self.host, self.port))
+                deadline = time.time() + timeout
+                while time.time() < deadline:
+                    self.sock.settimeout(max(0.05, deadline - time.time()))
+                    data, _ = self.sock.recvfrom(512)
+                    reply = json.loads(data.decode())
+                    if reply.get("id") == msgid:
+                        return reply.get("r")
+            except (OSError, ValueError):
+                pass
+        print(f"UNO Q ({self.host}): {method} -> sin respuesta", file=sys.stderr)
+        return None
+
+    def close(self):
+        self.connected = False
+        try:
+            self.sock.close()
+        except Exception:
+            pass
+
+
 class Tracker:
     """Decide pan/tilt a partir de la posición del rostro. `send(pan, tilt)` se llama solo
     cuando hay que mover; se inyecta para poder probarlo sin hardware."""
@@ -158,19 +259,31 @@ class Tracker:
         self.send(PAN_CENTER, TILT_CENTER)
 
 
-def make_tracker():
-    """Tracker conectado al router de la UNO Q, o None si no hay router (Mac, sin servos)."""
-    try:
-        client = RouterClient()
-    except ImportError:
-        print("Falta msgpack (pip install msgpack): sin seguimiento de cámara.", file=sys.stderr)
+def make_client(remote="auto"):
+    """Cliente hacia los servos: el router local si esta placa es la UNO Q, si no la UNO Q por
+    red (remote = "auto" para encontrarla sola, o su IP). None si no hay forma de llegar."""
+    if remote in (None, "auto", "local") and os.path.exists(SOCKET_PATH):
+        try:
+            client = RouterClient()
+        except ImportError:
+            print("Falta msgpack (pip install msgpack): sin seguimiento de cámara.", file=sys.stderr)
+            return None
+    elif remote == "local":
+        print("No hay arduino-router en esta placa; la cámara no se moverá.", file=sys.stderr)
         return None
-    if not client.connect():
+    else:
+        client = NetClient("auto" if remote is None else remote)
+    return client if client.connect() else None
+
+
+def make_tracker(remote="auto"):
+    """Tracker conectado a los servos (ver make_client), o None si no hay servos."""
+    client = make_client(remote)
+    if client is None:
         return None
     tracker = Tracker(lambda p, t: client.notify("aim", p, t))
     tracker.client = client
     tracker.center()
-    print("Cámara motorizada: conectada al router de la UNO Q.")
     return tracker
 
 
@@ -179,9 +292,11 @@ def main():
     ap.add_argument("--centrar", action="store_true")
     ap.add_argument("--barrido", action="store_true")
     ap.add_argument("--apuntar", nargs=2, type=int, metavar=("PAN", "TILT"))
+    ap.add_argument("--red", nargs="?", const="auto", metavar="IP",
+                    help="hablar con la UNO Q por red (desde la Pi); sin IP la busca sola")
     args = ap.parse_args()
-    client = RouterClient()
-    if not client.connect():
+    client = make_client(args.red if args.red else "local")
+    if client is None:
         sys.exit(1)
     print("estado:", client.call("status"))
     if args.apuntar:
