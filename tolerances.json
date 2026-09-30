@@ -25,7 +25,7 @@
       "max": 117.2,
       "promedio": 27.7
     },
-    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0 + muestras propias + expertos: invitado, exp4, exp5, exp6, exp7",
+    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0 + muestras propias + expertos: invitado, exp4, exp5, exp6, exp7, exp8",
     "ancho": {
       "pulgar": [
         24.5,
@@ -75,7 +75,7 @@
       "max": 180.0,
       "promedio": 172.5
     },
-    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0 + muestras propias + expertos: invitado, exp4, exp5, exp6, exp7",
+    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0 + muestras propias + expertos: invitado, exp4, exp5, exp6, exp7, exp8",
     "ancho": {
       "pulgar": [
         20.5,
@@ -121,11 +121,11 @@
       "promedio": 132.4
     },
     "menique": {
-      "min": 96.8,
+      "min": 91.0,
       "max": 180.0,
       "promedio": 147.8
     },
-    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0 + muestras propias + expertos: invitado, exp4, exp5, exp6, exp7",
+    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0 + muestras propias + expertos: invitado, exp4, exp5, exp6, exp7, exp8",
     "ancho": {
       "pulgar": [
         29.4,
@@ -175,7 +175,7 @@
       "max": 121.7,
       "promedio": 40.0
     },
-    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0 + muestras propias + expertos: invitado, exp4, exp5, exp6, exp7",
+    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0 + muestras propias + expertos: invitado, exp4, exp5, exp6, exp7, exp8",
     "ancho": {
       "pulgar": [
         26.7,
@@ -225,7 +225,7 @@
       "max": 157.1,
       "promedio": 101.7
     },
-    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0 + muestras propias + expertos: invitado, exp4, exp5, exp6, exp7",
+    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0 + muestras propias + expertos: invitado, exp4, exp5, exp6, exp7, exp8",
     "ancho": {
       "pulgar": [
         44.4,
@@ -275,7 +275,7 @@
       "max": 143.9,
       "promedio": 65.7
     },
-    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0 + muestras propias + expertos: invitado, exp4, exp5, exp6, exp7",
+    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0 + muestras propias + expertos: invitado, exp4, exp5, exp6, exp7, exp8",
     "ancho": {
       "pulgar": [
         28.3,
@@ -325,7 +325,7 @@
       "max": 142.0,
       "promedio": 69.1
     },
-    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0 + muestras propias + expertos: invitado, exp4, exp5, exp6, exp7",
+    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0 + muestras propias + expertos: invitado, exp4, exp5, exp6, exp7, exp8",
     "ancho": {
       "pulgar": [
         32.6,
@@ -375,7 +375,7 @@
       "max": 180.0,
       "promedio": 168.6
     },
-    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0 + muestras propias + expertos: invitado, exp4, exp5, exp6, exp7",
+    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0 + muestras propias + expertos: invitado, exp4, exp5, exp6, exp7, exp8",
     "ancho": {
       "pulgar": [
         43.5,
@@ -425,7 +425,7 @@
       "max": 168.0,
       "promedio": 71.8
     },
-    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0 + muestras propias + expertos: invitado, exp4, exp5, exp6, exp7",
+    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0 + muestras propias + expertos: invitado, exp4, exp5, exp6, exp7, exp8",
     "ancho": {
       "pulgar": [
         46.2,
@@ -475,7 +475,7 @@
       "max": 153.1,
       "promedio": 63.6
     },
-    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0 + muestras propias + expertos: invitado, exp4, exp5, exp6, exp7",
+    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0 + muestras propias + expertos: invitado, exp4, exp5, exp6, exp7, exp8",
     "ancho": {
       "pulgar": [
         32.7,
@@ -525,7 +525,7 @@
       "max": 180.0,
       "promedio": 170.5
     },
-    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0 + muestras propias + expertos: invitado, exp4, exp5, exp6, exp7",
+    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0 + muestras propias + expertos: invitado, exp4, exp5, exp6, exp7, exp8",
     "ancho": {
       "pulgar": [
         20.6,
@@ -575,7 +575,7 @@
       "max": 171.8,
       "promedio": 85.9
     },
-    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0 + muestras propias + expertos: invitado, exp4, exp5, exp6, exp7",
+    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0 + muestras propias + expertos: invitado, exp4, exp5, exp6, exp7, exp8",
     "ancho": {
       "pulgar": [
         24.3,
@@ -625,7 +625,7 @@
       "max": 160.1,
       "promedio": 70.0
     },
-    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0 + muestras propias + expertos: invitado, exp4, exp5, exp6, exp7",
+    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0 + muestras propias + expertos: invitado, exp4, exp5, exp6, exp7, exp8",
     "ancho": {
       "pulgar": [
         25.2,
@@ -675,7 +675,7 @@
       "max": 180.0,
       "promedio": 163.2
     },
-    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0 + muestras propias + expertos: invitado, exp4, exp5, exp6, exp7",
+    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0 + muestras propias + expertos: invitado, exp4, exp5, exp6, exp7, exp8",
     "ancho": {
       "pulgar": [
         41.6,
@@ -725,7 +725,7 @@
       "max": 176.6,
       "promedio": 112.6
     },
-    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0 + muestras propias + expertos: invitado, exp4, exp5, exp6, exp7",
+    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0 + muestras propias + expertos: invitado, exp4, exp5, exp6, exp7, exp8",
     "ancho": {
       "pulgar": [
         29.0,
@@ -775,7 +775,7 @@
       "max": 124.7,
       "promedio": 87.1
     },
-    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0 + muestras propias + expertos: invitado, exp4, exp5, exp6, exp7",
+    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0 + muestras propias + expertos: invitado, exp4, exp5, exp6, exp7, exp8",
     "ancho": {
       "pulgar": [
         27.6,
@@ -825,7 +825,7 @@
       "max": 142.3,
       "promedio": 74.6
     },
-    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0 + muestras propias + expertos: invitado, exp4, exp5, exp6, exp7",
+    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0 + muestras propias + expertos: invitado, exp4, exp5, exp6, exp7, exp8",
     "ancho": {
       "pulgar": [
         35.8,
@@ -875,7 +875,7 @@
       "max": 152.1,
       "promedio": 69.6
     },
-    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0 + muestras propias + expertos: invitado, exp4, exp5, exp6, exp7",
+    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0 + muestras propias + expertos: invitado, exp4, exp5, exp6, exp7, exp8",
     "ancho": {
       "pulgar": [
         34.1,
@@ -925,7 +925,7 @@
       "max": 124.8,
       "promedio": 38.9
     },
-    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0 + muestras propias + expertos: invitado, exp4, exp5, exp6, exp7",
+    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0 + muestras propias + expertos: invitado, exp4, exp5, exp6, exp7, exp8",
     "ancho": {
       "pulgar": [
         44.7,
@@ -975,7 +975,7 @@
       "max": 129.7,
       "promedio": 47.8
     },
-    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0 + muestras propias + expertos: invitado, exp4, exp5, exp6, exp7",
+    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0 + muestras propias + expertos: invitado, exp4, exp5, exp6, exp7, exp8",
     "ancho": {
       "pulgar": [
         28.8,
@@ -1025,7 +1025,7 @@
       "max": 135.4,
       "promedio": 62.8
     },
-    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0 + muestras propias + expertos: invitado, exp4, exp5, exp6, exp7",
+    "fuente": "zenodo-msl-abc, grupos AB, 20 personas, percentiles 1.0-99.0 + muestras propias + expertos: invitado, exp4, exp5, exp6, exp7, exp8",
     "ancho": {
       "pulgar": [
         27.7,

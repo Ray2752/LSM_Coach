@@ -67,6 +67,10 @@ class ShapeIssueTests(unittest.TestCase):
         self.assertIsNone(shape_issue({"G": 0.6, "L": 0.4}, "L"))
         self.assertIsNotNone(shape_issue({"D": 0.6, "L": 0.4}, "L"))
 
+    def test_c_cerrada_leida_como_o_la_decide_el_hueco(self):
+        self.assertIsNone(shape_issue({"O": 0.6, "C": 0.4}, "C"))
+        self.assertIsNotNone(shape_issue({"C": 0.6, "O": 0.4}, "O"))  # al revés no
+
     def test_umbral_de_error(self):
         self.assertIsNotNone(shape_issue({"B": 0.55, "B_mal": 0.45}, "B"))
         self.assertIsNone(shape_issue({"B": 0.65, "B_mal": 0.35}, "B"))

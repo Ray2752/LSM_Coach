@@ -1,7 +1,7 @@
 """Aparta muestras mal etiquetadas (p. ej. una "Y" grabada con otra letra seleccionada).
 
-Nada se borra: las filas se mueven a apartadas/correctas/<SEÑA>.csv con el motivo. Para
-deshacer, se copian de vuelta (o con git).
+Nada se borra: las filas se mueven a apartadas/correctas/<SEÑA>.csv (o apartadas/errores/
+con --errores) con el motivo. Para deshacer, se copian de vuelta (o con git).
 
 Nota: se probó apartar automáticamente lo que "contradice" a una persona de referencia
 (vecinos más cercanos), pero las manos de personas distintas difieren más entre sí que
@@ -10,6 +10,7 @@ una seña correcta de un error, así que apartaba muestras buenas. Por eso solo 
 Uso:
     python curate.py exp3:Y exp3:L               # solo muestra qué apartaría
     python curate.py exp3:Y exp3:L --aplicar
+    python curate.py rayexper:C --errores --motivo "..." --aplicar   # aparta errores
     python curate.py --espejo exp3 --aplicar     # refleja las muestras de quien grabó con la
                                                  # mano izquierda (repetirlo lo deshace)
 """
@@ -49,8 +50,13 @@ def main():
                     help="aparta todas las muestras correctas de esa persona en esa seña")
     ap.add_argument("--espejo", nargs="+", metavar="PERSONA", default=[],
                     help="refleja (mano izquierda -> derecha) todas las muestras de estas personas")
+    ap.add_argument("--errores", action="store_true",
+                    help=f"las marcas apartan errores ({ERRORS_DIR}/) en vez de correctas")
+    ap.add_argument("--motivo", default="etiqueta equivocada (revisión manual)",
+                    help="texto que se guarda junto a las muestras apartadas")
     ap.add_argument("--aplicar", action="store_true", help="sin esto solo muestra qué haría")
     args = ap.parse_args()
+    src_dir, kind = (ERRORS_DIR, "errores") if args.errores else (DATA_DIR, "correctas")
 
     for person in args.espejo:
         n = 0
@@ -73,14 +79,13 @@ def main():
     total = 0
     for mark in args.marcas:
         person, sign = mark.split(":", 1)
-        path = os.path.join(DATA_DIR, f"{sign}.csv")
+        path = os.path.join(src_dir, f"{sign}.csv")
         rows, fields = read(path)
         bad = {i for i, r in enumerate(rows) if r["person"] == person}
-        print(f"{sign}: {len(bad)} correctas de {person}")
+        print(f"{sign}: {len(bad)} {kind} de {person}")
         total += len(bad)
         if args.aplicar and bad:
-            move(rows, fields, bad, sign, "correctas",
-                 {i: "etiqueta equivocada (revisión manual)" for i in bad})
+            move(rows, fields, bad, sign, kind, {i: args.motivo for i in bad})
             with open(path, "w", newline="", encoding="utf-8") as f:
                 w = csv.DictWriter(f, fieldnames=fields)
                 w.writeheader()

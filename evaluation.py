@@ -21,14 +21,21 @@ ERROR_SUFFIX = "_mal"   # clase del clasificador con los errores típicos de una
 # de las correctas y rechaza ~80 % de los errores (evaluate_accuracy.py --por-persona)
 ERROR_MAX_PROB = 0.4
 
-# Letras con la misma forma de mano que solo cambian de orientación (la G es una L
-# horizontal; la H, una U horizontal). El clasificador ve la mano ya enderezada
-# (rotate_upright), así que no puede separarlas: eso lo decide la muñequera.
-SAME_SHAPE = {"L": {"G"}, "G": {"L"}, "U": {"H"}, "H": {"U"}}
+# Letras que el clasificador no separa bien y que decide otra medición:
+#  - misma forma, otra orientación (la G es una L horizontal; la H, una U horizontal): el
+#    clasificador ve la mano ya enderezada (rotate_upright); lo decide la muñequera.
+#  - C y O: misma curvatura; las separa el hueco entre pulgar y dedos (MIN_GAP). Una C
+#    cerrada, como la hacen varios expertos, se leía como O aunque el hueco fuera claro.
+SAME_SHAPE = {"L": {"G"}, "G": {"L"}, "U": {"H"}, "H": {"U"}, "C": {"O"}}
 
 # Separación máxima (grados) entre índice y meñique: "dedos separados" es el error típico
 # de la B. En las B correctas de los expertos llega a ~7°; en sus errores, la mediana es ~14°.
 MAX_SPREAD = {"B": 10.0}
+
+# Hueco mínimo entre la punta del pulgar y la del índice o medio (en unidades de la distancia
+# muñeca -> base del dedo medio). En las C correctas de los expertos, incluso las cerradas,
+# es >= ~0.45; en las O, <= ~0.26. Menos que esto es una C demasiado cerrada.
+MIN_GAP = {"C": 0.3}
 
 FINGER_LABEL = {"pulgar": "pulgar", "indice": "índice", "medio": "medio",
                 "anular": "anular", "menique": "meñique"}
@@ -110,7 +117,8 @@ def evaluate(angles, imu, tol, require_imu=True):
 def shape_issue(probs, target, max_error=ERROR_MAX_PROB):
     """probs: {clase: probabilidad} del clasificador (las clases "<SEÑA>_mal" son errores
     típicos). La forma está bien si `target` (o una letra de SAME_SHAPE) es la letra más
-    probable y su clase de error no llega a `max_error`. No se exige una probabilidad mínima para la letra: con muchas
+    probable y su clase de error no llega a `max_error`. No se exige una probabilidad mínima
+    para la letra: con muchas
     letras parecidas (A, S, T, E) la probabilidad se reparte aunque la seña esté bien.
     Devuelve un Issue, o None si está bien o si el modelo no conoce la seña."""
     if target not in probs:
@@ -143,3 +151,25 @@ def spread_issue(spread, target):
     if limit is not None and spread > limit:
         return Issue(CONFIG, "separacion", "Junta los dedos")
     return None
+
+
+def thumb_gap(features):
+    """Distancia de la punta del pulgar a la punta más cercana del índice o del medio, con
+    los 63 números de landmarks_to_features (ya escalados por muñeca -> base del medio)."""
+    def dist(a, b):
+        return math.dist(features[3 * a:3 * a + 3], features[3 * b:3 * b + 3])
+    return min(dist(4, 8), dist(4, 12))
+
+
+def gap_issue(gap, target):
+    """gap: thumb_gap de la mano. Issue si la seña pide hueco entre pulgar y dedos y no lo hay."""
+    limit = MIN_GAP.get(target)
+    if limit is not None and gap < limit:
+        return Issue(CONFIG, "hueco", "Abre la mano: deja espacio entre el pulgar y los dedos")
+    return None
+
+
+def geometry_issues(features, target):
+    """Reglas de forma que los ángulos de los dedos no ven: dedos juntos (B) y hueco (C)."""
+    issues = (spread_issue(finger_spread(features), target), gap_issue(thumb_gap(features), target))
+    return [i for i in issues if i]

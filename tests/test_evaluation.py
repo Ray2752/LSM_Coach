@@ -4,7 +4,8 @@
 """
 import unittest
 
-from evaluation import CONFIG, ORIENT, evaluate, finger_spread, spread_issue
+from evaluation import (CONFIG, ORIENT, evaluate, finger_spread, gap_issue, geometry_issues,
+                        spread_issue, thumb_gap)
 from tolerance_calculator import _range, mirror_features, one_sided, rotate_upright
 
 TOL = {f: {"min": 160.0, "max": 180.0} for f in ("pulgar", "indice", "medio", "anular", "menique")}
@@ -86,6 +87,30 @@ class SpreadTests(unittest.TestCase):
 
     def test_otras_letras_no_exigen_dedos_juntos(self):
         self.assertIsNone(spread_issue(40.0, "Y"))
+
+
+def hand_with_thumb_gap(gap):
+    """63 números con la punta del índice (8) en el origen y la del pulgar (4) a `gap`."""
+    f = [0.0] * 63
+    f[3 * 4], f[3 * 12] = gap, 5.0  # el medio lejos: manda el índice
+    return f
+
+
+class GapTests(unittest.TestCase):
+    def test_mide_el_hueco_al_dedo_mas_cercano(self):
+        self.assertAlmostEqual(thumb_gap(hand_with_thumb_gap(0.6)), 0.6)
+
+    def test_c_sin_hueco_pide_abrir(self):
+        issue = gap_issue(thumb_gap(hand_with_thumb_gap(0.1)), "C")
+        self.assertEqual((issue.parameter, issue.where), (CONFIG, "hueco"))
+        self.assertIsNone(gap_issue(thumb_gap(hand_with_thumb_gap(0.5)), "C"))
+
+    def test_otras_letras_no_exigen_hueco(self):
+        self.assertIsNone(gap_issue(0.0, "O"))
+
+    def test_geometry_junta_ambas_reglas(self):
+        self.assertEqual([i.where for i in geometry_issues(hand_with_thumb_gap(0.1), "C")], ["hueco"])
+        self.assertEqual(geometry_issues(hand_with_thumb_gap(0.5), "C"), [])
 
 
 class MirrorTests(unittest.TestCase):
