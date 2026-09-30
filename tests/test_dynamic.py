@@ -27,10 +27,10 @@ def feed_path(win, xs, fps=30, t0=0.0):
 
 class GestureWindowTests(unittest.TestCase):
     def test_una_pausa_dentro_de_una_palabra_no_corta_la_sena(self):
-        # GRACIAS / POR FAVOR: dos movimientos con una pausa de ~0.75 s en medio. Con los tiempos
+        # GRACIAS / POR FAVOR: dos movimientos con una pausa de ~0.65 s en medio. Con los tiempos
         # de palabra es UNA seña (se evalúa solo al final); con los de letra serían dos trazos.
         fps = 30
-        xs = ([0.5] * 10 + list(np.linspace(0.5, 0.8, 20)) + [0.8] * int(0.75 * fps)
+        xs = ([0.5] * 10 + list(np.linspace(0.5, 0.8, 20)) + [0.8] * int(0.65 * fps)
               + list(np.linspace(0.8, 0.5, 20)) + [0.5] * 45)
         word = GestureWindow(); word.configure(word=True)
         letter = GestureWindow(); letter.configure(word=False)

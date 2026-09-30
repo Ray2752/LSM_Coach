@@ -12,12 +12,12 @@ import numpy as np
 
 START_V = 1.6   # empieza el trazo al superar esta velocidad (manos/s) dos veces seguidas
 STOP_V = 1.0    # termina cuando baja de esta velocidad...
-STOP_S = 0.6    # ...durante este tiempo (letras). Se evalúa SOLO al terminar: una pausa más
+STOP_S = 0.55   # ...durante este tiempo (letras). Se evalúa SOLO al terminar: una pausa más
                 # corta que esto no corta el trazo ni saca avisos a mitad
 MIN_S = 0.4     # trazos más cortos se ignoran (un temblor no es una seña)
 MAX_S = 4.0     # tope: se corta y se clasifica lo que haya (letras)
-WORD_STOP_S = 0.9  # palabras y frases: llevan pausas dentro (GRACIAS, POR FAVOR) y son más largas
-WORD_MAX_S = 5.5
+WORD_STOP_S = 0.75  # palabras y frases: llevan pausas dentro (GRACIAS, POR FAVOR) y son más largas
+WORD_MAX_S = 5.0
 PRE_S = 0.2     # cuánto se conserva de antes del arranque (la forma inicial de la mano)
 SHOW_S = 3.0    # cuánto tiempo se muestra el resultado
 COOLDOWN_S = 1.2  # tras un resultado se ignoran trazos nuevos este tiempo: bajar la mano no

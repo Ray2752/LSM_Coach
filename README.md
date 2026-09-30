@@ -190,8 +190,8 @@ pecho, espacio neutro) y movimiento. No hay dataset público de LSM con ellas: h
    (botón **Deletrear** en la tarjeta de la palabra).
 
 La seña se graba entera y se evalúa **solo al terminar** (mano quieta): ningún aviso ni
-parpadeo del guante a mitad. Una palabra admite pausas internas de hasta 0.9 s (GRACIAS,
-POR FAVOR) y hasta 5.5 s de duración; una letra con movimiento, pausas de 0.6 s y 4 s
+parpadeo del guante a mitad. Una palabra admite pausas internas de hasta 0.75 s (GRACIAS,
+POR FAVOR) y hasta 5 s de duración; una letra con movimiento, pausas de 0.55 s y 4 s
 (`WORD_STOP_S`, `WORD_MAX_S`, `STOP_S`, `MAX_S` en `dynamic.py`).
 
 Las muestras quedan en `samples_words/<PALABRA>/*.npz` con índice en `samples_words/index.csv`.
