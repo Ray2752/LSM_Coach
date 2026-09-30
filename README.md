@@ -46,12 +46,16 @@ Pon el navegador del monitor en pantalla completa. Teclas: `1`–`5` cambian de 
 
 Opciones: `--cam2 N` agrega una segunda cámara; `--imu none` corre sin muñequera, solo para pruebas.
 
-## Demo en la Arduino UNO Q (todo en la placa, sin laptop)
+## Demo en la placa (Arduino UNO Q o Raspberry Pi 5, sin laptop)
 
-La UNO Q corre todo: cámara USB, visión, servidor web, Bluetooth con el guante y el
+La placa corre todo: cámara USB, visión, servidor web, Bluetooth con el guante y el
 navegador en la pantalla HDMI. Hardware: hub USB-C con entrada de energía (power bank
 5 V/3 A), monitor HDMI con su propia alimentación, cámara InnoMaker y teclado para
-configurar. La visión va a ~12 fotogramas por segundo en su procesador (suficiente).
+configurar. En la UNO Q (4 × Cortex-A53) la visión va a ~7 fotogramas por segundo en modo
+ligero: alcanza para las letras estáticas, va justa para los trazos. En una Raspberry Pi 5
+(4 × Cortex-A76, 3-4 veces más rápida y con GPU para el navegador) el mismo instalador y
+lanzador funcionan sin cambios y `run.sh` la detecta: 640x480, modelo completo de manos e
+interfaz con todos los efectos. `python uno_q/bench.py` mide los ms de cada etapa.
 
 1. Primer arranque en modo computadora (hub + pantalla + teclado): crear la contraseña,
    conectar el Wi-Fi con internet.
@@ -68,10 +72,12 @@ curl -fsSL https://raw.githubusercontent.com/Ray2752/LSM_Coach/main/uno_q/instal
    él todo funciona igual, solo local.
 4. Arrancar: `bash ~/LSM_Coach/uno_q/run.sh` (abre el navegador en pantalla completa; al
    cerrarlo con Alt+F4 se apaga el servidor). `--instalar-autostart` lo deja arrancando
-   solo al encender. `--sin-guante` para probar sin la muñequera.
+   solo al encender. `--sin-guante` para probar sin la muñequera. En la Pi, `--modelo-ligero`
+   sube los fps con el modelo ligero de manos; en la UNO Q, `--completo` quita el modo ligero.
 
 En Linux `--cam` acepta `/dev/videoN` o `auto` (la cámara USB cambia de número entre
-reinicios; `/dev/video0` y `1` son el códec del procesador, no cámaras).
+reinicios; `/dev/video0` y `1` en la UNO Q son el códec del procesador y en la Pi 5 hay
+decenas de nodos del ISP: `auto` prueba primero las cámaras USB y salta los demás).
 
 ## Calibrar con su cámara (muestras correctas y errores)
 

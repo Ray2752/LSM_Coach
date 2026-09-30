@@ -24,24 +24,40 @@ def timed(fn, n):
     return (time.perf_counter() - t0) / n * 1000
 
 
+def open_camera(cam, w, h):
+    linux = sys.platform.startswith("linux")
+    if linux:
+        from web_server import linux_video_devices, v4l_index
+        candidates = linux_video_devices() if cam == "auto" else [cam]
+    else:
+        candidates = [cam]
+    for dev in candidates:
+        dev = int(dev) if isinstance(dev, str) and dev.isdigit() else dev
+        cap = cv2.VideoCapture(v4l_index(dev), cv2.CAP_V4L2) if linux else cv2.VideoCapture(dev)
+        if linux:
+            cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, w)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, h)
+        ok, frame = cap.read()
+        if ok:
+            print(f"Cámara: {dev}")
+            return cap, frame
+        cap.release()
+    sys.exit("No se pudo leer ninguna cámara (python web_server.py --list-cams)")
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--cam", default="2" if sys.platform.startswith("linux") else "0")
+    ap.add_argument("--cam", default="auto" if sys.platform.startswith("linux") else "0",
+                    help="número, /dev/videoN o auto (Linux: la primera cámara USB con imagen)")
     ap.add_argument("--res", default="640x480")
     args = ap.parse_args()
     w, h = (int(v) for v in args.res.split("x"))
     import mediapipe as mp
 
-    print(f"CPU: {os.cpu_count()} núcleos | OpenCV {cv2.__version__} | MediaPipe {mp.__version__}")
-    dev = int(args.cam) if args.cam.isdigit() else args.cam
-    cap = cv2.VideoCapture(dev, cv2.CAP_V4L2) if sys.platform.startswith("linux") else cv2.VideoCapture(dev)
-    if sys.platform.startswith("linux"):
-        cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, w)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, h)
-    ok, frame = cap.read()
-    if not ok:
-        sys.exit("No se pudo leer la cámara")
+    model = open("/proc/device-tree/model").read().strip("\0") if os.path.exists("/proc/device-tree/model") else sys.platform
+    print(f"{model} | CPU: {os.cpu_count()} núcleos | OpenCV {cv2.__version__} | MediaPipe {mp.__version__}")
+    cap, frame = open_camera(args.cam, w, h)
     for _ in range(10):
         cap.read()
     ms_cap = timed(lambda: cap.read(), 30)
