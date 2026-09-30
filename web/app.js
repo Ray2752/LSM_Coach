@@ -14,7 +14,8 @@ const stagger = (s) => (M && M.stagger ? M.stagger(s) : 0);
 const SPRING = { type: 'spring', stiffness: 420, damping: 20, mass: .8 };
 const FINGER_RANGE = [0, 180];
 const AXIS_RANGE = { roll: [-180, 180], pitch: [-90, 90] };
-const AXIS_LABEL = { roll: 'giro', pitch: 'inclinación' };
+const AXIS_LABEL = { roll: 'giro', pitch: 'inclinación', yaw: 'rumbo' };
+const HORIZON_PITCH_PX = 18;      // el indicador de la muñequera: a 90° de inclinación la línea sube/baja esto
 const RING = 283;                 // perímetro del anillo (2π·45)
 const WELCOME_AFTER_MS = 2500;    // sin mano este tiempo -> pantalla de bienvenida
 const AUTO_VOICE_PERSIST_MS = 2200;  // el error debe durar esto para decirlo en voz alta
@@ -145,6 +146,8 @@ function render(s) {
   renderShape(s);
   renderFingers(s.fingers || []);
   renderOrientation(s.orientation || []);
+  renderNano(s);
+  renderSensors(s);
   renderStatus(s);
   renderWelcome(s);
   handleEvents(s);
@@ -322,6 +325,79 @@ function renderOrientation(axes) {
   }
 }
 
+const fmtDeg = (v) => (v == null || Number.isNaN(v) ? '—' : `${Math.round(v)}°`);
+
+// Recuadro sobre el video con lo que manda la Nano: orientación (giro, inclinación, rumbo),
+// un indicador que se mueve con la muñeca, y el enlace BLE (lecturas por segundo).
+function renderNano(s) {
+  const imu = s.imu || {};
+  const el = $('nano');
+  el.hidden = imu.mode === 'none';   // --imu none: no hay muñequera que mostrar
+  if (el.hidden) return;
+  const live = !!imu.connected && !imu.stale;
+  const kind = live ? 'on' : imu.connected ? 'wait' : 'off';
+  if (!el.classList.contains(kind)) {
+    el.classList.remove('on', 'wait', 'off');
+    el.classList.add(kind);
+    if (live) animate(el, { scale: [.96, 1] }, SPRING);
+  }
+  $('nano-state').textContent = live ? (imu.mode === 'mock' ? 'Simulada' : 'Conectada') : imu.connected ? 'Sin datos' : 'Buscando…';
+  $('nano-roll').textContent = live ? fmtDeg(imu.roll) : '—';
+  $('nano-pitch').textContent = live ? fmtDeg(imu.pitch) : '—';
+  $('nano-yaw').textContent = live ? fmtDeg(imu.yaw) : '—';
+  const pitch = Math.max(-1, Math.min(1, (imu.pitch || 0) / 90));
+  $('horizon-g').style.transform = live ? `rotate(${imu.roll || 0}deg) translateY(${(-pitch * HORIZON_PITCH_PX).toFixed(1)}px)` : '';
+  $('nano-foot').textContent = live
+    ? `IMU BMI270 · ${imu.mode === 'mock' ? 'teclado' : 'Bluetooth LE'} · ${imu.hz ? `${Math.round(imu.hz)} lecturas/s` : 'esperando lecturas'}`
+    : imu.connected ? 'Conectada, pero la Nano dejó de mandar lecturas' : 'Enciende la muñequera: se conecta sola';
+}
+
+// Lista clave–valor (panel de detalles). Las filas se crean una vez y luego solo se actualizan.
+function kvList(container, rows) {
+  while (container.children.length > rows.length) container.lastChild.remove();
+  rows.forEach(([name, value, kind], i) => {
+    let row = container.children[i];
+    if (!row) {
+      row = document.createElement('div');
+      row.innerHTML = '<dt></dt><dd></dd>';
+      container.append(row);
+    }
+    row.firstChild.textContent = name;
+    const dd = row.lastChild;
+    dd.textContent = value;
+    dd.className = kind || '';
+    dd.title = String(value);
+  });
+}
+
+// "Ángulos y orientación": datos de la cámara y de la Nano (aquí sí van los dos)
+function renderSensors(s) {
+  if ($('details-body').hidden) return;
+  const cam = s.camera || {}, imu = s.imu || {};
+  const hand = s.handedness === 'Right' ? 'derecha' : s.handedness === 'Left' ? 'izquierda' : s.hand ? 'sí' : 'no';
+  const dev = cam.device == null || cam.device === 'None' ? '—' : /^\d+$/.test(cam.device) ? `#${cam.device}` : cam.device;
+  kvList($('sensor-cam'), [
+    ['Dispositivo', dev],
+    ['Resolución', cam.width ? `${cam.width}×${cam.height}` : '—'],
+    ['Visión', s.camera_live === false ? 'sin imagen' : `${s.fps ?? 0} fps`, s.camera_live === false ? 'bad' : s.fps >= 8 ? 'ok' : 'wait'],
+    ['Mano', hand, s.hand ? 'ok' : ''],
+    ['Cámaras', String(s.cameras ?? 1)],
+  ]);
+  const live = !!imu.connected && !imu.stale;
+  const link = imu.mode === 'none' ? 'desactivada' : imu.mode === 'mock' ? 'simulada (teclado)'
+    : live ? 'BLE conectada' : imu.connected ? 'BLE sin datos' : 'BLE buscando';
+  kvList($('sensor-nano'), [
+    ['Enlace', link, imu.mode === 'none' ? '' : live ? 'ok' : imu.connected ? 'wait' : 'bad'],
+    ['Nombre', imu.name || 'LSM-Wrist'],
+    ['Dirección', imu.address || '—'],
+    ['Giro (roll)', live ? fmtDeg(imu.roll) : '—'],
+    ['Inclinación (pitch)', live ? fmtDeg(imu.pitch) : '—'],
+    ['Rumbo (yaw)', live ? fmtDeg(imu.yaw) : '—'],
+    ['Lecturas', live && imu.hz ? `${Math.round(imu.hz)} /s` : '—'],
+    ['Última lectura', imu.age_ms == null ? '—' : `hace ${imu.age_ms} ms`, imu.stale ? 'bad' : ''],
+  ]);
+}
+
 function setPill(id, kind, text) {
   const p = $(id);
   p.classList.remove('ok', 'bad', 'wait');
@@ -334,7 +410,7 @@ function renderStatus(s) {
   if (imu.mode === 'none') setPill('st-imu', 'wait', 'Sin muñequera');
   else if (imu.connected) setPill('st-imu', 'ok', 'Muñequera');
   else setPill('st-imu', 'bad', 'Buscando muñequera');
-  $('st-imu').title = imu.connected ? `giro ${Math.round(imu.roll)}° · inclinación ${Math.round(imu.pitch)}°` : 'Muñequera';
+  $('st-imu').title = imu.connected ? `giro ${Math.round(imu.roll)}° · inclinación ${Math.round(imu.pitch)}° · rumbo ${Math.round(imu.yaw)}°` : 'Muñequera';
 
   const hand = s.handedness === 'Right' ? 'mano derecha' : s.handedness === 'Left' ? 'mano izquierda' : '';
   if (s.camera_live === false) setPill('st-cam', 'bad', 'Sin imagen');
@@ -598,9 +674,14 @@ function previewLoop() {
   const fingers = (bad) => ['pulgar', 'indice', 'medio', 'anular', 'menique'].map((id) => ({
     id, label: { pulgar: 'pulgar', indice: 'índice', medio: 'medio', anular: 'anular', menique: 'meñique' }[id],
     value: bad.includes(id) ? 120 : 20, min: 0, max: 60, ok: !bad.includes(id) }));
-  const base = { target: 'A', calibrated: true, imu: { mode: 'ble', connected: true, roll: 5, pitch: -3 }, fps: 12,
+  const base = { target: 'A', calibrated: true, fps: 12,
+    imu: { mode: 'ble', name: 'LSM-Wrist', connected: true, stale: false, roll: 5, pitch: -3, yaw: 118, hz: 19.8, age_ms: 42, address: 'C4:9F:12:0A:7B:3E' },
+    camera: { device: '0', width: 1280, height: 720 },
     camera_live: true, cameras: 1, person: 'invitado', sync: { cloud: true, pending: 0 }, progress: {}, message: null,
     orientation: [{ axis: 'roll', value: 5, min: -20, max: 20, ok: true }, { axis: 'pitch', value: -3, min: -25, max: 25, ok: true }] };
+  const t0 = performance.now();
+  // la muñequera simulada se mueve un poco, para ver el indicador y los números cambiar
+  const wobble = () => { const t = (performance.now() - t0) / 1000; return { ...base.imu, roll: 5 + 18 * Math.sin(t * 1.3), pitch: -3 + 12 * Math.sin(t * .8), yaw: 118 + 6 * Math.sin(t * .4), age_ms: 20 + Math.round(30 * Math.abs(Math.sin(t * 7))) }; };
   const steps = [
     { hand: false, verdict: 'nohand', issues: [], failed_parameters: [], fingers: [], hold: 0, done: false },
     { hand: true, verdict: 'settling', settle: .45, issues: [], failed_parameters: [], fingers: fingers(['indice']), hold: 0, done: false },
@@ -612,7 +693,7 @@ function previewLoop() {
   ];
   const fixed = new URLSearchParams(location.search).get('preview');  // ?preview=2 -> solo ese paso
   let i = fixed === '' || fixed === null ? 0 : Number(fixed) || 0;
-  const tick = () => { render({ ...base, ...steps[Math.min(i, steps.length - 1)] }); };
+  const tick = () => { render({ ...base, imu: wobble(), ...steps[Math.min(i, steps.length - 1)] }); };
   setPill('st-link', 'ok', M ? 'Vista previa' : 'Vista previa · sin Motion');
   if (fixed) { noHandSince = performance.now() - WELCOME_AFTER_MS - 1; tick(); return; }
   tick();

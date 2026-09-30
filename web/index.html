@@ -82,6 +82,28 @@
 
         <div id="flash" class="flash" aria-hidden="true"></div>
         <div id="confetti" class="confetti" aria-hidden="true"></div>
+
+        <!-- Datos en vivo de la muñequera (Nano 33 BLE Sense): solo lo que manda la Nano.
+             Los datos de la cámara van en "Ángulos y orientación" (tecla D). -->
+        <div id="nano" class="nano" role="status" aria-label="Datos de la muñequera (Nano 33 BLE)" hidden>
+          <div class="nano-head">
+            <svg aria-hidden="true"><use href="#i-watch"/></svg>
+            <span class="nano-title">Nano 33 BLE</span>
+            <span id="nano-state" class="nano-state">Buscando…</span>
+          </div>
+          <div class="nano-body">
+            <svg class="horizon" viewBox="0 0 64 64" aria-hidden="true">
+              <circle class="h-ring" cx="32" cy="32" r="29"/>
+              <g id="horizon-g"><line class="h-line" x1="8" y1="32" x2="56" y2="32"/><circle class="h-dot" cx="32" cy="32" r="3.5"/></g>
+            </svg>
+            <dl class="nano-vals">
+              <div><dt title="roll">giro</dt><dd id="nano-roll">—</dd></div>
+              <div><dt title="pitch">inclinación</dt><dd id="nano-pitch">—</dd></div>
+              <div><dt title="yaw">rumbo</dt><dd id="nano-yaw">—</dd></div>
+            </dl>
+          </div>
+          <div id="nano-foot" class="nano-foot">IMU BMI270 · Bluetooth LE</div>
+        </div>
       </div>
     </section>
 
@@ -131,6 +153,10 @@
           <div id="orient-block" hidden>
             <h2>Orientación de la muñeca</h2>
             <div id="orient"></div>
+          </div>
+          <div class="sensors">
+            <div><h2>Cámara</h2><dl id="sensor-cam" class="kv"></dl></div>
+            <div><h2>Nano 33 BLE <small>muñequera</small></h2><dl id="sensor-nano" class="kv"></dl></div>
           </div>
         </div>
       </section>

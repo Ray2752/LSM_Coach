@@ -113,6 +113,27 @@ kbd { font: 700 .68rem "Nunito Sans", ui-monospace, monospace; border: 1px solid
 .verdict[data-icon="clock"] .i-clock { animation: spin 2.4s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* datos de la muñequera (Nano 33 BLE) sobre el video: solo lo que manda la Nano */
+.nano { position: absolute; left: .8rem; bottom: .8rem; z-index: 2; min-width: 16rem; padding: .55rem .85rem .5rem; border-radius: 16px; background: rgba(7, 20, 18, .8); backdrop-filter: blur(10px); box-shadow: var(--shadow); color: var(--muted); font-size: .78rem; }
+.nano-head { display: flex; align-items: center; gap: .4rem; font-weight: 800; color: var(--text); }
+.nano-head svg { width: 1.1em; height: 1.1em; fill: var(--accent-2); flex: none; }
+.nano-state { margin-left: auto; font-size: .64rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; padding: .12rem .5rem; border-radius: 999px; background: var(--wait-bg); color: var(--wait); }
+.nano.on .nano-state { background: var(--ok-bg); color: var(--ok); }
+.nano.off .nano-state { background: var(--bad-bg); color: var(--bad); }
+.nano-body { display: flex; align-items: center; gap: .8rem; margin-top: .45rem; }
+.horizon { width: 3.1rem; height: 3.1rem; flex: none; }
+.h-ring { fill: rgba(255, 255, 255, .05); stroke: rgba(148, 210, 198, .3); stroke-width: 2; }
+#horizon-g { transform-origin: 32px 32px; transition: transform .1s linear; }
+.h-line { stroke: var(--accent-2); stroke-width: 4; stroke-linecap: round; }
+.h-dot { fill: var(--text); }
+.nano.off .h-line, .nano.wait .h-line { stroke: rgba(148, 210, 198, .3); }
+.nano-vals { display: grid; grid-template-columns: repeat(3, auto); gap: .9rem; margin: 0; }
+.nano-vals div { min-width: 3.4rem; }
+.nano-vals dt { font-size: .6rem; text-transform: uppercase; letter-spacing: .1em; font-weight: 800; }
+.nano-vals dd { margin: .1rem 0 0; font-size: 1.3rem; font-weight: 800; line-height: 1.05; color: var(--text); font-variant-numeric: tabular-nums; }
+.nano.off .nano-vals dd, .nano.wait .nano-vals dd { color: var(--muted); }
+.nano-foot { margin-top: .4rem; font-size: .66rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+
 /* bienvenida cuando no hay mano */
 .welcome { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .6rem; text-align: center; padding: 2rem; background: linear-gradient(180deg, rgba(7, 20, 18, .3), rgba(7, 20, 18, .8)); }
 .welcome h1 { font-size: 2.1rem; font-weight: 800; letter-spacing: -.02em; }
@@ -179,6 +200,13 @@ kbd { font: 700 .68rem "Nunito Sans", ui-monospace, monospace; border: 1px solid
 .marker { position: absolute; top: -.22rem; width: .28rem; height: 1.05rem; margin-left: -.14rem; border-radius: 2px; background: var(--text); transition: left .1s linear; }
 .row.bad .marker { background: var(--bad); } .row.ok .marker { background: var(--ok); }
 #orient-block { margin-top: .5rem; }
+/* sensores: datos de la cámara y de la Nano, en dos columnas */
+.sensors { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem 1.2rem; margin-top: .6rem; padding-top: .5rem; border-top: 1px solid var(--line); }
+.kv { margin: 0; }
+.kv div { display: flex; justify-content: space-between; gap: .6rem; font-size: .78rem; padding: .1rem 0; }
+.kv dt { color: var(--muted); white-space: nowrap; }
+.kv dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kv dd.ok { color: var(--ok); } .kv dd.bad { color: var(--bad); } .kv dd.wait { color: var(--wait); }
 
 /* ---------- barra inferior ---------- */
 .bar { display: flex; align-items: center; gap: 1.2rem; padding: .7rem 1.4rem 1rem; }
@@ -251,7 +279,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
    corre con --lite. */
 body.lite { background: var(--bg); }
 body.lite *, body.lite *::before, body.lite *::after { animation: none !important; transition: none !important; backdrop-filter: none !important; text-shadow: none !important; }
-body.lite .card, body.lite .video-wrap, body.lite .verdict, body.lite .toast, body.lite .modal-card, body.lite .calib, body.lite .practice-bar, body.lite .pip, body.lite .ref { box-shadow: none !important; }
+body.lite .card, body.lite .video-wrap, body.lite .verdict, body.lite .toast, body.lite .modal-card, body.lite .calib, body.lite .practice-bar, body.lite .pip, body.lite .ref, body.lite .nano { box-shadow: none !important; }
+body.lite .nano { background: rgba(7, 20, 18, .92); }
 body.lite .card { background: var(--surface); }
 body.lite .top, body.lite .bar { background: var(--bg); }
 body.lite .logo, body.lite .action.primary, body.lite .signs button[aria-pressed="true"], body.lite .path span.current { box-shadow: none !important; }

@@ -28,7 +28,7 @@ from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from coach_engine import Coach
-from imu_source import BLEIMU, MockIMU
+from imu_source import DEVICE_NAME, BLEIMU, MockIMU
 from signs import ABECEDARIO, DYNAMIC, NIVEL_1, SIGNS, WORDS, level, ref_name
 from store import Store
 from tolerance_calculator import OUTPUT_FILE, append_sample
@@ -97,6 +97,8 @@ class Camera:
     def __init__(self, index, width=1280, height=720):
         # index: número (Mac/Windows), ruta "/dev/videoN" (Linux) o "auto" (la primera que dé imagen)
         self.index, self.width, self.height = index, width, height
+        self.device = None  # qué se abrió de verdad (con "auto", la ruta encontrada)
+        self.size = None    # resolución real de los fotogramas (ancho, alto)
         self.cap = self._open()
         if not self.cap.isOpened():
             sys.exit(f"No se pudo abrir la cámara {index}. Prueba: python web_server.py --list-cams")
@@ -110,9 +112,11 @@ class Camera:
                 cap = self._open_device(dev)
                 if cap.isOpened() and cap.read()[0]:
                     print(f"Cámara: {dev}")
+                    self.device = dev
                     return cap
                 cap.release()
             return cv2.VideoCapture()  # ninguna: queda "sin abrir"
+        self.device = self.index
         return self._open_device(self.index)
 
     def _open_device(self, dev):
@@ -144,6 +148,7 @@ class Camera:
                 self.frame = cv2.flip(frame, 1)  # igual que al grabar
                 self.seq += 1
                 self.last_t = time.time()
+                self.size = (frame.shape[1], frame.shape[0])
 
     def read(self):
         with self._lock:
@@ -209,7 +214,7 @@ class Runtime:
             now = time.time()
             self.fps = 0.9 * self.fps + 0.1 / max(now - t_prev, 1e-3)
             t_prev = now
-            if getattr(self.args, "lite", False) and now - t_log > 15:  # diagnóstico en la UNO Q
+            if sys.platform.startswith("linux") and now - t_log > 15:  # diagnóstico en la placa
                 t_log = now
                 print(f"Visión: {self.fps:.1f} fps", flush=True)
 
@@ -238,11 +243,16 @@ class Runtime:
 
     def status(self):
         v = self.imu_values()
+        cam = self.cams[0]
         return {
-            "imu": {"mode": self.args.imu, "connected": v is not None,
+            # datos de la Nano (muñequera): orientación + estado del enlace BLE (Hz, dirección, edad)
+            "imu": {"mode": self.args.imu, "name": DEVICE_NAME,
+                    **(self.imu.stats() if self.imu else {"connected": False}),
                     **({k: round(x, 1) for k, x in v.items()} if v else {})},
-            "fps": round(self.fps, 1) if self.cams[0].live else 0,
-            "camera_live": self.cams[0].live,
+            "camera": {"device": str(cam.device), "width": cam.size[0] if cam.size else None,
+                       "height": cam.size[1] if cam.size else None},
+            "fps": round(self.fps, 1) if cam.live else 0,
+            "camera_live": cam.live,
             "cameras": len(self.cams),
             "person": self.person,
             "progress": dict(self.coach.progress),
@@ -399,11 +409,27 @@ async def ws_endpoint(ws: WebSocket):
 
 
 def linux_video_devices():
-    """Rutas /dev/video* en orden. En la UNO Q, /dev/video0 y 1 son el códec de video del
-    procesador (no dan imagen) y la cámara USB cambia de número entre reinicios: por eso
-    existe --cam auto, que prueba cada una hasta encontrar la que sí da imagen."""
+    """Rutas /dev/video* que pueden ser cámaras, las USB primero. En la UNO Q, /dev/video0 y 1
+    son el códec de video del procesador; en la Raspberry Pi 5 hay decenas de nodos del ISP
+    (pispbe, rp1-cfe, hevc) que no dan imagen y se saltan. La cámara USB cambia de número
+    entre reinicios: por eso existe --cam auto, que prueba cada una hasta la que sí da imagen."""
     import glob
-    return sorted(glob.glob("/dev/video*"), key=lambda p: int(p[len("/dev/video"):] or 0))
+    devices = []
+    for path in glob.glob("/dev/video*"):
+        num = path[len("/dev/video"):]
+        if not num.isdigit():
+            continue
+        sysfs = f"/sys/class/video4linux/video{num}"
+        usb = "/usb" in os.path.realpath(f"{sysfs}/device") if os.path.exists(f"{sysfs}/device") else False
+        if not usb:
+            try:
+                name = open(f"{sysfs}/name").read().strip().lower()
+            except OSError:
+                name = ""
+            if any(k in name for k in ("pispbe", "rp1-cfe", "hevc", "unicam", "codec", "isp")):
+                continue
+        devices.append((0 if usb else 1, int(num), path))
+    return [p for _, _, p in sorted(devices)]
 
 
 def v4l_index(dev):

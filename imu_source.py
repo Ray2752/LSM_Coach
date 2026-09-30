@@ -2,6 +2,8 @@
 
 Ambas clases exponen lo mismo:
     .latest    -> {"roll": float, "pitch": float, "yaw": float}
+    .connected -> True cuando hay lecturas de verdad (el simulado siempre)
+    .stats()   -> estado del enlace para la interfaz: conectada, dirección, Hz, edad de la lectura
     .start() / .stop()
     .vibrate(ms) -> hace vibrar la muñequera (el simulado solo lo imprime)
 
@@ -12,11 +14,13 @@ import asyncio
 import os
 import struct
 import threading
+import time
 
 DEVICE_NAME = "LSM-Wrist"
 CHAR_UUID = "19B10001-E8F2-537E-4F6C-D104768A1214"  # orientación (notify)
 VIB_UUID = "19B10002-E8F2-537E-4F6C-D104768A1214"   # vibración (write)
 ADDR_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".lsm_wrist_addr")
+STALE_S = 1.5  # sin lecturas este tiempo: el enlace se muestra como "sin datos" aunque siga conectado
 
 
 def save_address(addr):
@@ -35,11 +39,50 @@ def load_address():
         return None
 
 
-class MockIMU:
-    STEP = 5.0
+class _IMU:
+    """Lo común a las dos fuentes: la última orientación y las estadísticas del enlace,
+    que la interfaz muestra en el recuadro de la muñequera."""
 
     def __init__(self):
         self.latest = {"roll": 0.0, "pitch": 0.0, "yaw": 0.0}
+        self.connected = False
+        self.address = None   # dirección BLE de la Nano (None si no se ha conectado)
+        self.hz = 0.0         # lecturas por segundo que están llegando
+        self.last_t = None    # cuándo llegó la última lectura (time.time())
+        self._count, self._win_t = 0, None
+
+    def _got(self, roll, pitch, yaw, now=None):
+        """Registra una lectura nueva y actualiza la tasa (ventana de 1 s)."""
+        now = time.time() if now is None else now
+        self.latest.update(roll=roll, pitch=pitch, yaw=yaw)
+        self.last_t = now
+        if self._win_t is None:
+            self._win_t, self._count = now, 0
+        self._count += 1
+        if now - self._win_t >= 1.0:
+            self.hz = self._count / (now - self._win_t)
+            self._win_t, self._count = now, 0
+
+    def _reset_link(self):
+        self.connected = False
+        self.hz, self.last_t = 0.0, None
+        self._win_t, self._count = None, 0
+
+    def stats(self, now=None):
+        """Estado del enlace: conectada, dirección, Hz y hace cuánto llegó la última lectura (ms)."""
+        now = time.time() if now is None else now
+        age = None if self.last_t is None else round((now - self.last_t) * 1000)
+        stale = age is not None and age > STALE_S * 1000
+        return {"connected": self.connected, "address": self.address,
+                "hz": 0.0 if stale else round(self.hz, 1), "age_ms": age, "stale": stale}
+
+
+class MockIMU(_IMU):
+    STEP = 5.0
+
+    def __init__(self):
+        super().__init__()
+        self.connected = True  # simulada: siempre "hay lectura"
 
     def start(self):
         pass
@@ -62,12 +105,12 @@ class MockIMU:
             self.latest[axis] += delta
         elif ch == "r":
             self.latest.update(roll=0.0, pitch=0.0, yaw=0.0)
+        self._got(**self.latest)
 
 
-class BLEIMU:
+class BLEIMU(_IMU):
     def __init__(self):
-        self.latest = {"roll": 0.0, "pitch": 0.0, "yaw": 0.0}
-        self.connected = False
+        super().__init__()
         self._stop = threading.Event()
         self._thread = None
         self._loop = None
@@ -102,8 +145,7 @@ class BLEIMU:
         asyncio.run(self._main())
 
     def _on_data(self, _, data: bytearray):
-        roll, pitch, yaw = struct.unpack("<3f", data)
-        self.latest.update(roll=roll, pitch=pitch, yaw=yaw)
+        self._got(*struct.unpack("<3f", data))
 
     async def _main(self):
         from bleak import BleakScanner, BleakClient
@@ -125,6 +167,7 @@ class BLEIMU:
             try:
                 async with BleakClient(device) as client:
                     self._client = client
+                    self.address = client.address
                     self.connected = True
                     save_address(client.address)
                     await client.start_notify(CHAR_UUID, self._on_data)
@@ -139,4 +182,4 @@ class BLEIMU:
                 await asyncio.sleep(1)
             finally:
                 self._client = None
-                self.connected = False
+                self._reset_link()
