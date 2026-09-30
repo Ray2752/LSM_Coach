@@ -129,6 +129,31 @@ Resultados:
   acepta el 98-100 % de sus señas correctas y rechaza el 73-85 % de sus errores
   (85-91 % de aciertos correctas vs. errores). Mejora al grabar errores de más personas.
 
+## Letras con movimiento (Nivel 2: J, K, Ñ, Q, X, Z)
+
+Se entrenan con los videos del dataset público de señas dinámicas (Zenodo
+10.5281/zenodo.14689869: 621 videos frontales, 20 personas). El flujo:
+
+```bash
+python extract_dynamic.py --root ~/Downloads/datos_ent/MSL-dynamic-signs   # trayectorias -> samples_dynamic/ (~8 min)
+python train_dynamic.py --por-persona                                      # model_dynamic.joblib
+```
+
+Cada video se remuestrea a 32 pasos con la forma de la mano, el recorrido de la muñeca, la
+velocidad y el giro de la mano; un ExtraTrees clasifica el trazo. Además aprende una clase
+**"quieta"** (la forma de la letra sostenida con temblor, sintetizada de cada video): sin
+ella, bastaba poner la forma de la mano para que la diera por correcta. Resultado: **98 %** de
+los trazos del split de prueba (personas nuevas) y **87 %** dejando fuera a cada persona;
+las quietas se detectan al 100 %. Las confusiones quedan entre K, Q y X.
+
+En la app (`dynamic.py`): con una letra con movimiento elegida, se espera a que la muñeca
+(suavizada) supere ~1.6 tamaños de mano por segundo, se graba el trazo hasta que se detiene
+0.45 s, sale de cuadro o pasan 3.5 s, y se clasifica. Antes de clasificar, el trazo debe
+recorrer ≥ 0.8 tamaños de mano y abarcar ≥ 0.3 (el ruido de los landmarks recorre mucho pero
+no se extiende). Si la letra pedida es la más probable con ≥ 0.25, cuenta como lograda; si
+no, vibra una vez y dice a qué se pareció o que falta el movimiento. Las palabras se
+practican deletreándolas (pestaña **Palabras**), con las letras estáticas.
+
 ## Base de datos en la nube (Supabase)
 
 1. Crea un proyecto en supabase.com y ejecuta `db/supabase_schema.sql` en el *SQL Editor*.

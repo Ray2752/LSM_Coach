@@ -6,6 +6,7 @@ que la forma de la mano se reconozca como la letra objetivo. También decide:
   - cuándo vibrar (solo si el error persiste, sin repetir de más)
   - cuándo contar la seña como lograda (registro de progreso del aprendiz)
 """
+import math
 import time
 from collections import deque
 from dataclasses import asdict
@@ -13,9 +14,10 @@ from dataclasses import asdict
 import cv2
 import mediapipe as mp
 
-from evaluation import (CONFIG, ERROR_SUFFIX, FINGER_LABEL, SAME_SHAPE, evaluate, geometry_issues,
-                        shape_issue)
-from signs import NIVEL_1
+from dynamic import MAX_S, MIN_PROB, SHOW_S, STILL, GestureWindow, classify
+from evaluation import (CONFIG, ERROR_SUFFIX, FINGER_LABEL, SAME_SHAPE, Issue, evaluate,
+                        geometry_issues, shape_issue)
+from signs import DYNAMIC, NIVEL_1
 from tolerance_calculator import (FINGER_JOINTS, landmarks_to_angles, landmarks_to_features,
                                   mirror_features)
 
@@ -24,6 +26,9 @@ PERSIST_S = 0.6   # el error debe durar esto para avisar (evita avisos por parpa
 REPEAT_S = 6.0    # si sigues con el MISMO error, se repite hasta pasado este tiempo
 MIN_GAP_S = 1.5   # pausa mínima entre dos avisos cualquiera
 HOLD_OK_S = 1.0   # la seña debe mantenerse correcta este tiempo para contarla como lograda
+SETTLE_S = 1.2    # al aparecer la mano o cambiar de letra: tiempo para formar la seña sin evaluar
+FIX_STABLE_S = 0.5  # un error debe persistir esto antes de marcarse (evita parpadeos en rojo)
+OK_STABLE_S = 0.15  # lo correcto se muestra casi de inmediato (para que el anillo arranque)
 RED = (80, 80, 255)
 
 
@@ -53,10 +58,13 @@ class AlertPolicy:
 
 
 class Coach:
-    def __init__(self, tolerances, target=NIVEL_1[0], require_imu=True, model=None):
+    def __init__(self, tolerances, target=NIVEL_1[0], require_imu=True, model=None, dyn_model=None):
         self.tolerances = tolerances
         self.require_imu = require_imu
         self.model = model        # clasificador de landmarks (opcional)
+        self.dyn_model = dyn_model  # clasificador de trazos para J, K, Ñ, Q, X, Z (opcional)
+        self.gesture = GestureWindow()
+        self._dyn_result = None   # último trazo clasificado: {"t", "best", "prob", "ok"}
         self.proba_hist = deque(maxlen=SMOOTH_FRAMES)
         self.hands = mp.solutions.hands.Hands(max_num_hands=1, min_detection_confidence=0.6)
         self.history = {f: deque(maxlen=SMOOTH_FRAMES) for f in FINGER_JOINTS}
@@ -64,13 +72,30 @@ class Coach:
         self.alerts = AlertPolicy()
         self.progress = {}        # {seña: veces lograda en esta sesión}
         self.last_sample = None   # la última lectura cruda, para guardarla como muestra
+        self._settle_until = 0.0  # hasta cuándo se le da tiempo de formar la seña
+        self._was_hand = False
+        self._cand, self._cand_since, self._stable = None, 0.0, None  # veredicto con histéresis
         self.set_target(target)
 
     def set_target(self, sign):
         self.target = sign
         self.alerts.reset()
         self.proba_hist.clear()
+        self._settle_until = time.time() + SETTLE_S
+        self._cand = self._stable = None
+        self.gesture.reset()
+        self._dyn_result = None
         self._new_attempt(time.time())
+
+    def _stable_verdict(self, raw, now):
+        """'ok'/'fix' solo cuando el veredicto crudo se sostiene un rato: un dedo que roza el
+        límite un instante no debe poner la pantalla en rojo (ni vibrar)."""
+        if raw != self._cand:
+            self._cand, self._cand_since = raw, now
+        need = OK_STABLE_S if raw == "ok" else FIX_STABLE_S
+        if self._stable is None or now - self._cand_since >= need:
+            self._stable = raw
+        return self._stable
 
     def _new_attempt(self, now):
         self._attempt_start, self._ok_since = now, None
@@ -92,11 +117,19 @@ class Coach:
             self.feat_hist.clear()
             self.proba_hist.clear()
             self.last_sample = None
+            self._was_hand = False
+            self._cand = self._stable = None
+            alert, achievement = False, None
+            if self.target in DYNAMIC and self.dyn_model is not None:
+                if self.gesture.active:  # la mano salió de cuadro: ahí terminó el trazo
+                    alert, achievement = self._classify_segment(self.gesture.finish(now), now)
+                self._dyn_state(state, now)  # el resultado se sigue mostrando aunque baje la mano
+            self.gesture.reset()
             self.alerts.update(None, now)
             if self._counted:  # bajó la mano después de lograrla: empieza otro intento
                 self._new_attempt(now)
             self._ok_since = None
-            return state, False, None
+            return state, alert, achievement
 
         lm = res.multi_hand_landmarks[0]
         mp.solutions.drawing_utils.draw_landmarks(frame, lm, mp.solutions.hands.HAND_CONNECTIONS)
@@ -105,6 +138,10 @@ class Coach:
             self.history[f].append(a)
         angles = {f: sum(v) / len(v) for f, v in self.history.items()}
         state["hand"] = True
+        if not self._was_hand:  # la mano acaba de aparecer: tiempo para formar la seña
+            self._settle_until = now + SETTLE_S
+            self._cand = self._stable = None
+        self._was_hand = True
         if res.multi_handedness:
             state["handedness"] = res.multi_handedness[0].classification[0].label
         features = landmarks_to_features(lm.landmark)
@@ -112,6 +149,9 @@ class Coach:
             features = mirror_features(features)
         self.last_sample = {"angles": raw, "landmarks": features,
                             "imu": dict(imu) if imu else None}
+
+        if self.target in DYNAMIC and self.dyn_model is not None:
+            return self._process_dynamic(state, now, features, raw, lm, state["handedness"])
 
         if tol is None:
             state["verdict"] = "uncalibrated"
@@ -152,12 +192,66 @@ class Coach:
                 "axis": axis, "value": None if v is None else round(v, 1),
                 "min": rng["min"], "max": rng["max"],
                 "ok": v is not None and rng["min"] <= v <= rng["max"]})
-        state["issues"] = [asdict(i) for i in result.issues]
-        state["failed_parameters"] = result.failed_parameters
-        state["verdict"] = "ok" if result.ok else "fix"
+        verdict = self._stable_verdict("ok" if result.ok else "fix", now)
+        if now < self._settle_until:  # todavía está formando la seña: no se juzga
+            verdict = "settling"
+            state["settle"] = round((self._settle_until - now) / SETTLE_S, 2)
+        state["issues"] = [asdict(i) for i in result.issues] if verdict == "fix" else []
+        state["failed_parameters"] = result.failed_parameters if verdict == "fix" else []
+        state["verdict"] = verdict
 
-        alert = self.alerts.update(result.issues[0].action if result.issues else None, now)
-        return state, alert, self._track_progress(result, now)
+        alert = self.alerts.update(result.issues[0].action if verdict == "fix" and result.issues else None, now)
+        achievement = self._track_progress(result, now, ok=verdict == "ok")
+        # para el anillo de progreso de la interfaz: qué parte de HOLD_OK_S lleva sostenida
+        state["hold"] = round(min(1.0, (now - self._ok_since) / HOLD_OK_S), 2) if self._ok_since else 0.0
+        state["done"] = self._counted
+        return state, alert, achievement
+
+    def _process_dynamic(self, state, now, features, raw, lm, handedness):
+        """Letras con movimiento: acumula el trazo de la muñeca y lo clasifica cuando la mano
+        se detiene. Veredictos: ready (esperando el trazo), moving (grabando), ok / fix."""
+        state["calibrated"] = True
+        w, m = lm.landmark[0], lm.landmark[9]
+        size = math.hypot(m.x - w.x, m.y - w.y)
+        x = 1.0 - w.x if handedness == "Left" else w.x  # mano izquierda: reflejada, como los landmarks
+        angles = [raw[f] for f in ("pulgar", "indice", "medio", "anular", "menique")]
+        segment = self.gesture.feed(now, features, angles, (x, w.y, size))
+        alert, achievement = self._classify_segment(segment, now)
+        self._dyn_state(state, now)
+        return state, alert, achievement
+
+    def _classify_segment(self, segment, now):
+        """Clasifica un trazo terminado. Devuelve (vibrar, logro)."""
+        if segment is None:
+            return False, None
+        best, prob = classify(self.dyn_model, segment)
+        ok = best == self.target and prob >= MIN_PROB
+        self._dyn_result = {"t": now, "best": best, "prob": prob, "ok": ok}
+        if ok:
+            self.progress[self.target] = self.progress.get(self.target, 0) + 1
+            return False, {"sign": self.target, "seconds": segment["duration"], "failed_parameters": []}
+        return True, None  # una vibración: el trazo no fue el esperado
+
+    def _dyn_state(self, state, now):
+        """Veredicto de una letra con movimiento: el último resultado (SHOW_S), o si está
+        grabando el trazo, o esperando a que empiece."""
+        r = self._dyn_result
+        if r and now - r["t"] < SHOW_S:
+            state["verdict"] = "ok" if r["ok"] else "fix"
+            state["done"] = r["ok"]
+            state["hold"] = 1.0 if r["ok"] else 0.0
+            state["motion"] = {"best": r["best"], "prob": round(r["prob"], 2)}
+            if not r["ok"]:
+                action = (f"Falta el movimiento: haz el trazo completo de la {self.target}" if r["best"] == STILL
+                          else f"El trazo se parece a la {r['best']}" if r["best"] != self.target
+                          else f"Repite el trazo de la {self.target} más claro")
+                state["issues"] = [asdict(Issue(CONFIG, "movimiento", action))]
+                state["failed_parameters"] = [CONFIG]
+        elif self.gesture.active:
+            state["verdict"] = "moving"
+            state["hold"] = round(min(1.0, self.gesture.elapsed / MAX_S), 2)
+        elif state["hand"]:
+            state["verdict"] = "ready"
 
     def _shape_probs(self, features):
         """Probabilidades del clasificador promediadas en los últimos fotogramas."""
@@ -168,10 +262,11 @@ class Coach:
         return {str(c): sum(p[i] for p in self.proba_hist) / n
                 for i, c in enumerate(self.model.classes_)}
 
-    def _track_progress(self, result, now):
-        """Cuenta la seña como lograda una vez por intento, si se sostiene HOLD_OK_S."""
-        self._failed_seen.update(result.failed_parameters)
-        if not result.ok:
+    def _track_progress(self, result, now, ok):
+        """Cuenta la seña como lograda una vez por intento, si se sostiene HOLD_OK_S.
+        `ok` es el veredicto estable (no el crudo del fotograma)."""
+        if not ok:
+            self._failed_seen.update(result.failed_parameters)
             self._ok_since = None
             return None
         if self._ok_since is None:

@@ -4,17 +4,54 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>LSM Coach</title>
+  <link rel="icon" type="image/png" sizes="256x256" href="/static/favicon.png">
+  <link rel="icon" href="/static/favicon.ico" sizes="any">
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
+  <!-- Iconos: Phosphor Icons (phosphor-icons/core, licencia MIT), incrustados porque la demo no tiene internet.
+       Se usan con <use href="#i-...">. Rellenos (fill), no trazos. -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-hand" viewBox="0 0 256 256"><path d="M188,84a32,32,0,0,0-8,1V60a32,32,0,0,0-43.21-30A32,32,0,0,0,76,44v1A32,32,0,0,0,36,76v76a92,92,0,0,0,184,0V116A32,32,0,0,0,188,84Zm8,68a68,68,0,0,1-136,0V76a8,8,0,0,1,16,0v40a12,12,0,0,0,24,0V44a8,8,0,0,1,16,0v64a12,12,0,0,0,24,0V60a8,8,0,0,1,16,0v65.4A52.09,52.09,0,0,0,116,176a12,12,0,0,0,24,0,28,28,0,0,1,28-28,12,12,0,0,0,12-12V116a8,8,0,0,1,16,0Z"/></symbol>
+      <symbol id="i-wave" viewBox="0 0 256 256"><path d="M184.63,23.14a12,12,0,0,1,15-8A72.34,72.34,0,0,1,228.4,32a12,12,0,0,1-16.58,17.35,48.31,48.31,0,0,0-19.2-11.2A12,12,0,0,1,184.63,23.14ZM232.85,167.8A92,92,0,0,1,64.31,190l-40-69.32A32,32,0,0,1,36,77a31.72,31.72,0,0,1,7.54-3.14A32,32,0,0,1,88.65,32.45a32,32,0,0,1,53,3.55l14.53,25.17A32,32,0,0,1,206.35,68l17.31,30A91.38,91.38,0,0,1,232.85,167.8Zm-30-57.81L185.57,80a8,8,0,0,0-13.86,8h0l6.68,11.57a12,12,0,0,1-3.18,15.59,28,28,0,0,0-6.41,38.1,12,12,0,1,1-19.86,13.46,52.05,52.05,0,0,1,3.9-63.4L120.9,48A8,8,0,0,0,107,56l24.25,42a12,12,0,1,1-20.78,12L79.33,56a8,8,0,0,0-13.85,8L99,122a12,12,0,0,1-20.78,12L58.93,100.67a8,8,0,1,0-13.85,8L85.1,178a68,68,0,0,0,117.78-68ZM50.46,198a12,12,0,1,0-20.78,12,132.79,132.79,0,0,0,20,26.38,12,12,0,1,0,17.17-16.76A109.2,109.2,0,0,1,50.46,198Z"/></symbol>
+      <symbol id="i-check" viewBox="0 0 256 256"><path d="M232.49,80.49l-128,128a12,12,0,0,1-17,0l-56-56a12,12,0,1,1,17-17L96,183,215.51,63.51a12,12,0,0,1,17,17Z"/></symbol>
+      <symbol id="i-x" viewBox="0 0 256 256"><path d="M208.49,191.51a12,12,0,0,1-17,17L128,145,64.49,208.49a12,12,0,0,1-17-17L111,128,47.51,64.49a12,12,0,0,1,17-17L128,111l63.51-63.52a12,12,0,0,1,17,17L145,128Z"/></symbol>
+      <symbol id="i-clock" viewBox="0 0 256 256"><path d="M128,20A108,108,0,1,0,236,128,108.12,108.12,0,0,0,128,20Zm0,192a84,84,0,1,1,84-84A84.09,84.09,0,0,1,128,212Zm68-84a12,12,0,0,1-12,12H128a12,12,0,0,1-12-12V72a12,12,0,0,1,24,0v44h44A12,12,0,0,1,196,128Z"/></symbol>
+      <symbol id="i-alert" viewBox="0 0 256 256"><path d="M240.26,186.1,152.81,34.23h0a28.74,28.74,0,0,0-49.62,0L15.74,186.1a27.45,27.45,0,0,0,0,27.71A28.31,28.31,0,0,0,40.55,228h174.9a28.31,28.31,0,0,0,24.79-14.19A27.45,27.45,0,0,0,240.26,186.1Zm-20.8,15.7a4.46,4.46,0,0,1-4,2.2H40.55a4.46,4.46,0,0,1-4-2.2,3.56,3.56,0,0,1,0-3.73L124,46.2a4.77,4.77,0,0,1,8,0l87.44,151.87A3.56,3.56,0,0,1,219.46,201.8ZM116,136V104a12,12,0,0,1,24,0v32a12,12,0,0,1-24,0Zm28,40a16,16,0,1,1-16-16A16,16,0,0,1,144,176Z"/></symbol>
+      <symbol id="i-move" viewBox="0 0 256 256"><path d="M228,48V96a12,12,0,0,1-12,12H168a12,12,0,0,1,0-24h19l-7.8-7.8a75.55,75.55,0,0,0-53.32-22.26h-.43A75.49,75.49,0,0,0,72.39,75.57,12,12,0,1,1,55.61,58.41a99.38,99.38,0,0,1,69.87-28.47H126A99.42,99.42,0,0,1,196.2,59.23L204,67V48a12,12,0,0,1,24,0ZM183.61,180.43a75.49,75.49,0,0,1-53.09,21.63h-.43A75.55,75.55,0,0,1,76.77,179.8L69,172H88a12,12,0,0,0,0-24H40a12,12,0,0,0-12,12v48a12,12,0,0,0,24,0V189l7.8,7.8A99.42,99.42,0,0,0,130,226.06h.56a99.38,99.38,0,0,0,69.87-28.47,12,12,0,0,0-16.78-17.16Z"/></symbol>
+      <symbol id="i-camera" viewBox="0 0 256 256"><path d="M208,56H180.28L166.65,35.56A8,8,0,0,0,160,32H96a8,8,0,0,0-6.65,3.56L75.71,56H48A24,24,0,0,0,24,80V192a24,24,0,0,0,24,24H208a24,24,0,0,0,24-24V80A24,24,0,0,0,208,56Zm8,136a8,8,0,0,1-8,8H48a8,8,0,0,1-8-8V80a8,8,0,0,1,8-8H80a8,8,0,0,0,6.66-3.56L100.28,48h55.43l13.63,20.44A8,8,0,0,0,176,72h32a8,8,0,0,1,8,8ZM128,88a44,44,0,1,0,44,44A44.05,44.05,0,0,0,128,88Zm0,72a28,28,0,1,1,28-28A28,28,0,0,1,128,160Z"/></symbol>
+      <symbol id="i-watch" viewBox="0 0 256 256"><path d="M208,128a79.94,79.94,0,0,0-32.7-64.47l-6.24-34.38A16,16,0,0,0,153.32,16H102.68A16,16,0,0,0,86.94,29.15L80.7,63.53a79.9,79.9,0,0,0,0,128.94l6.24,34.38A16,16,0,0,0,102.68,240h50.64a16,16,0,0,0,15.74-13.15l6.24-34.38A79.94,79.94,0,0,0,208,128ZM102.68,32h50.64l3.91,21.55a79.75,79.75,0,0,0-58.46,0ZM64,128a64,64,0,1,1,64,64A64.07,64.07,0,0,1,64,128Zm89.32,96H102.68l-3.91-21.55a79.75,79.75,0,0,0,58.46,0ZM120,128V88a8,8,0,0,1,16,0v32h32a8,8,0,0,1,0,16H128A8,8,0,0,1,120,128Z"/></symbol>
+      <symbol id="i-cloud" viewBox="0 0 256 256"><path d="M160,40A88.09,88.09,0,0,0,81.29,88.67,64,64,0,1,0,72,216h88a88,88,0,0,0,0-176Zm0,160H72a48,48,0,0,1,0-96c1.1,0,2.2,0,3.29.11A88,88,0,0,0,72,128a8,8,0,0,0,16,0,72,72,0,1,1,72,72Z"/></symbol>
+      <symbol id="i-wifi" viewBox="0 0 256 256"><path d="M140,204a12,12,0,1,1-12-12A12,12,0,0,1,140,204ZM237.08,87A172,172,0,0,0,18.92,87,8,8,0,0,0,29.08,99.37a156,156,0,0,1,197.84,0A8,8,0,0,0,237.08,87ZM205,122.77a124,124,0,0,0-153.94,0A8,8,0,0,0,61,135.31a108,108,0,0,1,134.06,0,8,8,0,0,0,11.24-1.3A8,8,0,0,0,205,122.77Zm-32.26,35.76a76.05,76.05,0,0,0-89.42,0,8,8,0,0,0,9.42,12.94,60,60,0,0,1,70.58,0,8,8,0,1,0,9.42-12.94Z"/></symbol>
+      <symbol id="i-play" viewBox="0 0 256 256"><path d="M234.49,111.07,90.41,22.94A20,20,0,0,0,60,39.87V216.13a20,20,0,0,0,30.41,16.93l144.08-88.13a19.82,19.82,0,0,0,0-33.86ZM84,208.85V47.15L216.16,128Z"/></symbol>
+      <symbol id="i-stop" viewBox="0 0 256 256"><path d="M200,36H56A20,20,0,0,0,36,56V200a20,20,0,0,0,20,20H200a20,20,0,0,0,20-20V56A20,20,0,0,0,200,36Zm-4,160H60V60H196Z"/></symbol>
+      <symbol id="i-volume" viewBox="0 0 256 256"><path d="M155.51,24.81a8,8,0,0,0-8.42.88L77.25,80H32A16,16,0,0,0,16,96v64a16,16,0,0,0,16,16H77.25l69.84,54.31A8,8,0,0,0,160,224V32A8,8,0,0,0,155.51,24.81ZM32,96H72v64H32ZM144,207.64,88,164.09V91.91l56-43.55Zm54-106.08a40,40,0,0,1,0,52.88,8,8,0,0,1-12-10.58,24,24,0,0,0,0-31.72,8,8,0,0,1,12-10.58ZM248,128a79.9,79.9,0,0,1-20.37,53.34,8,8,0,0,1-11.92-10.67,64,64,0,0,0,0-85.33,8,8,0,1,1,11.92-10.67A79.83,79.83,0,0,1,248,128Z"/></symbol>
+      <symbol id="i-message" viewBox="0 0 256 256"><path d="M128,24A104,104,0,0,0,36.18,176.88L24.83,210.93a16,16,0,0,0,20.24,20.24l34.05-11.35A104,104,0,1,0,128,24Zm0,192a87.87,87.87,0,0,1-44.06-11.81,8,8,0,0,0-6.54-.67L40,216,52.47,178.6a8,8,0,0,0-.66-6.54A88,88,0,1,1,128,216Z"/></symbol>
+      <symbol id="i-settings" viewBox="0 0 256 256"><path d="M128,80a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Zm109.94-52.79a8,8,0,0,0-3.89-5.4l-29.83-17-.12-33.62a8,8,0,0,0-2.83-6.08,111.91,111.91,0,0,0-36.72-20.67,8,8,0,0,0-6.46.59L128,41.85,97.88,25a8,8,0,0,0-6.47-.6A112.1,112.1,0,0,0,54.73,45.15a8,8,0,0,0-2.83,6.07l-.15,33.65-29.83,17a8,8,0,0,0-3.89,5.4,106.47,106.47,0,0,0,0,41.56,8,8,0,0,0,3.89,5.4l29.83,17,.12,33.62a8,8,0,0,0,2.83,6.08,111.91,111.91,0,0,0,36.72,20.67,8,8,0,0,0,6.46-.59L128,214.15,158.12,231a7.91,7.91,0,0,0,3.9,1,8.09,8.09,0,0,0,2.57-.42,112.1,112.1,0,0,0,36.68-20.73,8,8,0,0,0,2.83-6.07l.15-33.65,29.83-17a8,8,0,0,0,3.89-5.4A106.47,106.47,0,0,0,237.94,107.21Zm-15,34.91-28.57,16.25a8,8,0,0,0-3,3c-.58,1-1.19,2.06-1.81,3.06a7.94,7.94,0,0,0-1.22,4.21l-.15,32.25a95.89,95.89,0,0,1-25.37,14.3L134,199.13a8,8,0,0,0-3.91-1h-.19c-1.21,0-2.43,0-3.64,0a8.08,8.08,0,0,0-4.1,1l-28.84,16.1A96,96,0,0,1,67.88,201l-.11-32.2a8,8,0,0,0-1.22-4.22c-.62-1-1.23-2-1.8-3.06a8.09,8.09,0,0,0-3-3.06l-28.6-16.29a90.49,90.49,0,0,1,0-28.26L61.67,97.63a8,8,0,0,0,3-3c.58-1,1.19-2.06,1.81-3.06a7.94,7.94,0,0,0,1.22-4.21l.15-32.25a95.89,95.89,0,0,1,25.37-14.3L122,56.87a8,8,0,0,0,4.1,1c1.21,0,2.43,0,3.64,0a8.08,8.08,0,0,0,4.1-1l28.84-16.1A96,96,0,0,1,188.12,55l.11,32.2a8,8,0,0,0,1.22,4.22c.62,1,1.23,2,1.8,3.06a8.09,8.09,0,0,0,3,3.06l28.6,16.29A90.49,90.49,0,0,1,222.9,142.12Z"/></symbol>
+      <symbol id="i-next" viewBox="0 0 256 256"><path d="M224.49,136.49l-72,72a12,12,0,0,1-17-17L187,140H40a12,12,0,0,1,0-24H187L135.51,64.48a12,12,0,0,1,17-17l72,72A12,12,0,0,1,224.49,136.49Z"/></symbol>
+      <symbol id="i-trophy" viewBox="0 0 256 256"><path d="M232,64H208V48a8,8,0,0,0-8-8H56a8,8,0,0,0-8,8V64H24A16,16,0,0,0,8,80V96a40,40,0,0,0,40,40h3.65A80.13,80.13,0,0,0,120,191.61V216H96a8,8,0,0,0,0,16h64a8,8,0,0,0,0-16H136V191.58c31.94-3.23,58.44-25.64,68.08-55.58H208a40,40,0,0,0,40-40V80A16,16,0,0,0,232,64ZM48,120A24,24,0,0,1,24,96V80H48v32q0,4,.39,8Zm144-8.9c0,35.52-29,64.64-64,64.9a64,64,0,0,1-64-64V56H192ZM232,96a24,24,0,0,1-24,24h-.5a81.81,81.81,0,0,0,.5-8.9V80h24Z"/></symbol>
+      <symbol id="i-sliders" viewBox="0 0 256 256"><path d="M40,88H73a32,32,0,0,0,62,0h81a8,8,0,0,0,0-16H135a32,32,0,0,0-62,0H40a8,8,0,0,0,0,16Zm64-24A16,16,0,1,1,88,80,16,16,0,0,1,104,64ZM216,168H199a32,32,0,0,0-62,0H40a8,8,0,0,0,0,16h97a32,32,0,0,0,62,0h17a8,8,0,0,0,0-16Zm-48,24a16,16,0,1,1,16-16A16,16,0,0,1,168,192Z"/></symbol>
+    </defs>
+  </svg>
+
   <header class="top">
-    <div class="brand">LSM Coach <span>Seña correcta</span></div>
-    <div id="progress" class="progress" aria-label="Señas logradas"></div>
+    <div class="brand">
+      <span class="logo" aria-hidden="true"><img src="/static/logo.png" alt=""></span>
+      <div>
+        <div class="name">LSM Coach</div>
+        <div class="tag">Seña correcta · Lengua de Señas Mexicana</div>
+      </div>
+    </div>
+
+    <div id="path" class="path" aria-label="Avance del Nivel 1"></div>
+
     <div class="status" aria-live="polite">
-      <span id="st-imu" class="pill">Muñequera</span>
-      <span id="st-cam" class="pill">Cámara</span>
-      <span id="st-cloud" class="pill">Nube</span>
-      <span id="st-link" class="pill bad">Conectando…</span>
+      <span id="st-cam" class="pill" title="Cámara"><svg><use href="#i-camera"/></svg><b>Cámara</b></span>
+      <span id="st-imu" class="pill" title="Muñequera"><svg><use href="#i-watch"/></svg><b>Muñequera</b></span>
+      <span id="st-cloud" class="pill" title="Nube"><svg><use href="#i-cloud"/></svg><b>Nube</b></span>
+      <span id="st-link" class="pill bad" title="Servidor"><svg><use href="#i-wifi"/></svg><b>Conectando</b></span>
     </div>
   </header>
 
@@ -23,36 +60,77 @@
       <div class="video-wrap">
         <img id="video" src="/video/0" alt="Cámara con la mano detectada">
         <img id="video2" class="pip" alt="Segunda cámara" hidden>
-        <div id="verdict" class="verdict wait" role="status">Conectando…</div>
+
+        <div id="verdict" class="verdict wait" data-icon="hand" role="status">
+          <span class="v-badge" aria-hidden="true">
+            <svg class="ring" viewBox="0 0 100 100"><circle class="ring-bg" cx="50" cy="50" r="44"/><circle id="ring" class="ring-fg" cx="50" cy="50" r="44"/></svg>
+            <svg class="v-icon i-hand"><use href="#i-hand"/></svg>
+            <svg class="v-icon i-check"><use href="#i-check"/></svg>
+            <svg class="v-icon i-x"><use href="#i-x"/></svg>
+            <svg class="v-icon i-clock"><use href="#i-clock"/></svg>
+            <svg class="v-icon i-alert"><use href="#i-alert"/></svg>
+            <svg class="v-icon i-move"><use href="#i-move"/></svg>
+          </span>
+          <span id="verdict-text" class="v-text">Conectando…</span>
+        </div>
+
+        <div id="welcome" class="welcome" hidden>
+          <svg class="hand-anim" aria-hidden="true"><use href="#i-wave"/></svg>
+          <h1>Muestra tu mano a la cámara</h1>
+          <p>Ponte el guante, coloca la mano frente a la cámara y forma la letra <b id="welcome-letter">A</b>.</p>
+        </div>
+
+        <div id="flash" class="flash" aria-hidden="true"></div>
+        <div id="confetti" class="confetti" aria-hidden="true"></div>
       </div>
     </section>
 
     <aside class="panel">
-      <section class="target">
-        <div class="label">Seña objetivo</div>
-        <div class="target-row">
+      <section class="target card">
+        <div class="target-head">
           <div id="target-letter" class="letter">–</div>
           <div class="target-text">
+            <div class="label">Seña objetivo <span id="target-level" class="level"></span></div>
             <p id="target-desc" class="desc"></p>
             <p id="target-typical" class="muted"></p>
           </div>
           <img id="target-ref" class="ref" alt="Referencia de la seña" hidden>
         </div>
-        <ul id="target-shape" class="shape"></ul>
       </section>
 
-      <section class="feedback">
-        <h2>Qué corregir</h2>
-        <ul id="issues" class="issues"></ul>
+      <section class="coach card">
+        <div class="coach-row">
+          <div class="instruction">
+            <div class="label">Qué hacer ahora</div>
+            <p id="instruction" class="big">Conectando…</p>
+            <ul id="issues" class="issues"></ul>
+            <p id="shape" class="shape-line" hidden></p>
+          </div>
+
+          <figure class="hand" aria-label="Diagrama de la mano: dedos correctos en verde, dedos a corregir en rojo">
+            <svg id="hand-svg" viewBox="0 0 200 250">
+              <rect id="h-palm" class="part" x="26" y="130" width="132" height="100" rx="30"/>
+              <rect data-finger="menique" class="part finger" x="28" y="56" width="27" height="92" rx="13"/>
+              <rect data-finger="anular" class="part finger" x="62" y="32" width="27" height="116" rx="13"/>
+              <rect data-finger="medio" class="part finger" x="96" y="22" width="27" height="126" rx="13"/>
+              <rect data-finger="indice" class="part finger" x="130" y="38" width="27" height="110" rx="13"/>
+              <rect data-finger="pulgar" class="part finger" x="152" y="118" width="28" height="86" rx="14" transform="rotate(-38 166 200)"/>
+              <g id="h-wrist" class="wrist"><rect x="52" y="234" width="80" height="14" rx="7"/></g>
+            </svg>
+            <figcaption><span class="dot ok"></span> bien <span class="dot bad"></span> corrige <span class="dot"></span> sin evaluar</figcaption>
+          </figure>
+        </div>
       </section>
 
-      <section class="gauges">
-        <p id="shape" class="shape-line" hidden></p>
-        <h2>Dedos <small>cerrado ← → extendido</small></h2>
-        <div id="fingers"></div>
-        <div id="orient-block" hidden>
-          <h2>Orientación de la muñeca</h2>
-          <div id="orient"></div>
+      <section class="details card">
+        <button id="details-toggle" class="link" aria-expanded="false"><svg><use href="#i-sliders"/></svg> Ángulos y orientación <kbd>D</kbd></button>
+        <div id="details-body" hidden>
+          <h2>Dedos <small>cerrado ← → extendido</small></h2>
+          <div id="fingers"></div>
+          <div id="orient-block" hidden>
+            <h2>Orientación de la muñeca</h2>
+            <div id="orient"></div>
+          </div>
         </div>
       </section>
     </aside>
@@ -62,22 +140,47 @@
     <div id="groups" class="groups" role="tablist" aria-label="Grupo de señas">
       <button data-group="1" role="tab">Nivel 1</button>
       <button data-group="2" role="tab">Nivel 2</button>
-      <button data-group="all" role="tab">Abecedario</button>
+      <button data-group="all" role="tab">A–Z</button>
+      <button data-group="words" role="tab">Palabras</button>
     </div>
     <div id="sign-buttons" class="signs" role="group" aria-label="Elegir seña"></div>
-    <button id="speak" class="action">Escuchar <kbd>Espacio</kbd></button>
-    <button id="calib-toggle" class="ghost" aria-expanded="false">Calibración</button>
+    <div class="actions">
+      <button id="practice" class="action primary"><svg class="i-play"><use href="#i-play"/></svg><svg class="i-stop"><use href="#i-stop"/></svg><span id="practice-label">Practicar Nivel 1</span></button>
+      <button id="voice-auto" class="toggle" aria-pressed="true" title="Decir las correcciones en voz alta"><svg><use href="#i-volume"/></svg><span>Voz</span></button>
+      <button id="speak" class="ghost" title="Escuchar la corrección ahora"><svg><use href="#i-message"/></svg><span>Escuchar</span><kbd>Espacio</kbd></button>
+      <button id="calib-toggle" class="ghost icon" aria-expanded="false" title="Calibración (equipo)"><svg><use href="#i-settings"/></svg></button>
+    </div>
   </footer>
 
   <div id="calib" class="calib" hidden>
+    <span class="label">Calibración (solo equipo)</span>
     <label>Persona <input id="person" value="invitado" maxlength="30" autocomplete="off"></label>
-    <button id="rec-ok" class="rec-ok">Guardar muestra correcta</button>
-    <button id="rec-err" class="rec-err">Guardar error intencional</button>
+    <button id="rec-ok" class="rec-ok">Guardar correcta</button>
+    <button id="rec-err" class="rec-err">Guardar error</button>
     <button id="reload" class="ghost">Recargar rangos</button>
   </div>
 
+  <div id="summary" class="modal" hidden>
+    <div class="modal-card">
+      <h1 id="summary-title"><svg><use href="#i-trophy"/></svg> Resultados</h1>
+      <table id="summary-table"><thead><tr><th>Seña</th><th>Resultado</th><th>Tiempo</th><th>Avisos</th></tr></thead><tbody></tbody></table>
+      <p id="summary-foot" class="muted"></p>
+      <div class="modal-actions">
+        <button id="summary-again" class="action primary"><svg><use href="#i-play"/></svg><span>Practicar otra vez</span></button>
+        <button id="summary-close" class="ghost">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="practice-bar" class="practice-bar" hidden>
+    <span id="practice-step"></span>
+    <button id="practice-skip" class="ghost">Saltar <svg><use href="#i-next"/></svg></button>
+    <button id="practice-stop" class="ghost">Terminar</button>
+  </div>
+
   <div id="toast" class="toast" role="status" hidden></div>
-  <p class="credits">Imágenes de referencia: MSL Alphabet (Morfín; Navarrete-López y López-Nava), Zenodo, CC BY 4.0</p>
+  <!-- Motion (motion.dev, MIT) para las animaciones; copia local en web/vendor porque la demo no tiene internet -->
+  <script src="/static/vendor/motion.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>

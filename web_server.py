@@ -62,6 +62,19 @@ def load_model(path="model.joblib"):
     return model
 
 
+def load_dynamic_model(path="model_dynamic.joblib"):
+    """Clasificador de trazos (train_dynamic.py). Sin él, las letras con movimiento solo
+    muestran la animación de referencia."""
+    if not os.path.exists(path):
+        print(f"Aviso: no hay {path}; las letras con movimiento no se evalúan.")
+        return None
+    import joblib
+    bundle = joblib.load(path)
+    bundle["model"].n_jobs = 1
+    print(f"Clasificador de movimiento cargado: {', '.join(bundle['signs'])}")
+    return bundle
+
+
 class Camera:
     """Lee una cámara en su propio hilo y guarda el último fotograma (ya en espejo).
     Si deja de mandar imagen (se desconectó o cambió de índice), la vuelve a abrir."""
@@ -134,7 +147,7 @@ class Runtime:
             self.store.start_sync()
         self.tolerances = load_tolerances()
         self.coach = Coach(self.tolerances, target=args.sign, require_imu=args.imu != "none",
-                           model=load_model())
+                           model=load_model(), dyn_model=load_dynamic_model())
         self.imu = {"mock": MockIMU, "ble": BLEIMU}.get(args.imu, lambda: None)()
         if self.imu:
             self.imu.start()
@@ -145,8 +158,11 @@ class Runtime:
         self.state = {}
         self.fps = 0.0
         self.message = None  # aviso breve para la interfaz: {"id", "text", "kind"}
+        self.achievement = None  # última seña lograda: {"id", "sign", "seconds", ...} (celebración)
+        self.alert = None        # último aviso de vibración: {"id", "action"} (icono de la muñequera)
         self._last_save = 0.0
         self._msg_id = 0
+        self._event_id = 0
         self._lock = threading.Lock()  # protege al Coach (hilo de visión vs. órdenes web)
         threading.Thread(target=self._loop, daemon=True).start()
 
@@ -175,10 +191,16 @@ class Runtime:
     def _step(self, frame):
         with self._lock:
             state, alert, achievement = self.coach.process(frame, self.imu_values())
-        if alert and self.imu:
-            self.imu.vibrate(VIBRATE_MS)
+        if alert:
+            if self.imu:
+                self.imu.vibrate(VIBRATE_MS)
+            self._event_id += 1
+            self.alert = {"id": self._event_id, "action": state["issues"][0]["action"] if state["issues"] else ""}
+            print(f"Vibra ({state['target']}): {self.alert['action'] or state['verdict']}", flush=True)
         if achievement:
             self.store.add_attempt(person=self.person, **achievement)
+            self._event_id += 1
+            self.achievement = {"id": self._event_id, **achievement}
         self.jpeg[0] = encode(frame)
         for i, cam in enumerate(self.cams[1:], start=1):
             other, _ = cam.read()
@@ -198,6 +220,8 @@ class Runtime:
             "progress": dict(self.coach.progress),
             "sync": self.store.status(),
             "message": self.message,
+            "achievement": self.achievement,
+            "alert": self.alert,
         }
 
     def notify(self, text, kind="ok"):
@@ -218,10 +242,11 @@ class Runtime:
             self.record(bool(msg.get("is_error")))
         elif kind == "reload":
             self.tolerances = load_tolerances()
-            model = load_model()
+            model, dyn_model = load_model(), load_dynamic_model()
             with self._lock:
                 self.coach.tolerances = self.tolerances
                 self.coach.model = model
+                self.coach.dyn_model = dyn_model
             self.notify(f"Rangos recargados: {', '.join(self.tolerances) or 'ninguno'}")
 
     def record(self, is_error):
@@ -281,7 +306,7 @@ def api_signs():
         info = {k: v for k, v in SIGNS[sign].items() if k != "forma"}
         out.append({
             **info, "sign": sign, "level": level(sign), "dynamic": dynamic,
-            "calibrated": tol is not None,
+            "calibrated": tol is not None or (dynamic and rt.coach.dyn_model is not None),
             "shape": SIGNS[sign].get("forma", {}),
             "orientation": bool(tol and tol.get("orientacion")),
             "ref": f"/static/ref/{ref_name(sign, 'gif' if dynamic else 'jpg')}",
@@ -323,7 +348,10 @@ async def ws_endpoint(ws: WebSocket):
     for t in done:
         t.exception()  # el navegador se fue (WebSocketDisconnect): no es un error
     if stopping():
-        await ws.close()
+        try:
+            await ws.close()
+        except Exception:  # el navegador ya había cerrado por su lado: nada que hacer
+            pass
 
 
 def linux_video_devices():
@@ -391,7 +419,13 @@ def main():
     print(f"Abre http://localhost:{args.port} en el monitor (pantalla completa). Ctrl+C para salir.")
     server = uvicorn.Server(uvicorn.Config(app, host=args.host, port=args.port, log_level="warning",
                                            timeout_graceful_shutdown=2))
-    server.run()
+    try:
+        server.run()
+    except KeyboardInterrupt:  # segundo Ctrl+C mientras cierra: salir sin traceback
+        pass
+    if rt.imu:
+        rt.imu.stop()
+    print("Servidor cerrado.")
 
 
 if __name__ == "__main__":
