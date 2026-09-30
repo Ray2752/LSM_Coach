@@ -192,7 +192,7 @@ class Runtime:
         return dict(self.imu.latest)
 
     def _loop(self):
-        last_seq, t_prev = -1, time.time()
+        last_seq, t_prev, t_log = -1, time.time(), 0.0
         while True:
             frame, seq = self.cams[0].read()
             if frame is None or seq == last_seq:
@@ -207,6 +207,9 @@ class Runtime:
             now = time.time()
             self.fps = 0.9 * self.fps + 0.1 / max(now - t_prev, 1e-3)
             t_prev = now
+            if getattr(self.args, "lite", False) and now - t_log > 15:  # diagnóstico en la UNO Q
+                t_log = now
+                print(f"Visión: {self.fps:.1f} fps", flush=True)
 
     def _step(self, frame):
         with self._lock:
@@ -245,6 +248,7 @@ class Runtime:
             "message": self.message,
             "achievement": self.achievement,
             "alert": self.alert,
+            "lite": bool(getattr(self.args, "lite", False)),  # la interfaz quita efectos costosos
         }
 
     def notify(self, text, kind="ok"):
@@ -456,12 +460,17 @@ def main():
     ap.add_argument("--host", default="127.0.0.1",
                     help="0.0.0.0 para abrir la interfaz desde otro equipo del hotspot")
     ap.add_argument("--port", type=int, default=8000)
+    ap.add_argument("--lite", action="store_true",
+                    help="UNO Q: video MJPEG más ligero (calidad 55, 12 fps) e interfaz sin efectos")
     ap.add_argument("--seguir", action="store_true",
                     help="cámara motorizada (UNO Q + servos, uno_q/pan_tilt): sigue el rostro de la persona")
     ap.add_argument("--list-cams", action="store_true", help="muestra las cámaras y sale")
     args = ap.parse_args()
     if args.list_cams:
         return list_cams()
+    if args.lite:
+        global JPEG_QUALITY, VIDEO_FPS
+        JPEG_QUALITY, VIDEO_FPS = 55, 12  # menos trabajo para codificar y para que el navegador decodifique
 
     rt = Runtime(args)
     print(f"Abre http://localhost:{args.port} en el monitor (pantalla completa). Ctrl+C para salir.")

@@ -244,3 +244,16 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .credits { position: fixed; right: .8rem; bottom: .2rem; margin: 0; font-size: .58rem; color: var(--muted); opacity: .55; pointer-events: none; }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* ---------- modo ligero (UNO Q: navegador sin GPU) ----------
+   Sin desenfoques, sombras, degradados ni animaciones continuas: en dibujo por software cada
+   uno de esos efectos cuesta fotogramas. Se activa con ?lite=1 (run.sh) o cuando el servidor
+   corre con --lite. */
+body.lite { background: var(--bg); }
+body.lite *, body.lite *::before, body.lite *::after { animation: none !important; transition: none !important; backdrop-filter: none !important; text-shadow: none !important; }
+body.lite .card, body.lite .video-wrap, body.lite .verdict, body.lite .toast, body.lite .modal-card, body.lite .calib, body.lite .practice-bar, body.lite .pip, body.lite .ref { box-shadow: none !important; }
+body.lite .card { background: var(--surface); }
+body.lite .top, body.lite .bar { background: var(--bg); }
+body.lite .logo, body.lite .action.primary, body.lite .signs button[aria-pressed="true"], body.lite .path span.current { box-shadow: none !important; }
+body.lite .modal { backdrop-filter: none !important; background: rgba(4, 10, 9, .9); }
+body.lite .hand-anim { filter: none; }

@@ -49,8 +49,9 @@ fi
 command -v xset >/dev/null 2>&1 && xset s off -dpms 2>/dev/null
 
 # --cam auto: la cámara USB cambia de /dev/videoN entre reinicios. 640x480 alivia al procesador.
+# --lite: video MJPEG más ligero e interfaz sin efectos (el navegador de la UNO Q no tiene GPU).
 # shellcheck disable=SC2086
-python web_server.py --cam auto --res 640x480 --imu "$IMU" $EXTRA &
+python web_server.py --cam auto --res 640x480 --imu "$IMU" --lite $EXTRA &
 SERVER=$!
 
 # espera a que el servidor responda (máx. 60 s: MediaPipe tarda en cargar la primera vez)
@@ -61,11 +62,14 @@ for _ in $(seq 1 60); do
 done
 
 BROWSER=$(command -v chromium || command -v chromium-browser || command -v firefox-esr || command -v firefox)
+# nice: la visión (MediaPipe) tiene prioridad sobre el navegador. Las banderas de GPU intentan
+# usar la aceleración del QRB2210 (si no existe, Chromium cae a software sin fallar).
 if [[ "$BROWSER" == *chromium* ]]; then
-  "$BROWSER" --kiosk --noerrdialogs --disable-infobars --no-first-run --disable-session-crashed-bubble \
-             --autoplay-policy=no-user-gesture-required "$URL"
+  nice -n 5 "$BROWSER" --kiosk --noerrdialogs --disable-infobars --no-first-run --disable-session-crashed-bubble \
+             --autoplay-policy=no-user-gesture-required --ignore-gpu-blocklist --enable-gpu-rasterization \
+             --enable-zero-copy --disable-smooth-scrolling "$URL/?lite=1"
 else
-  "$BROWSER" --kiosk "$URL"
+  nice -n 5 "$BROWSER" --kiosk "$URL/?lite=1"
 fi
 
 kill $SERVER 2>/dev/null

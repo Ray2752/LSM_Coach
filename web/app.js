@@ -5,7 +5,11 @@ const $ = (id) => document.getElementById(id);
 // Animaciones con Motion (motion.dev, copia local en web/vendor). Si no cargó, no se anima
 // nada pero la app sigue funcionando igual.
 const M = window.Motion || null;
-const animate = (el, keyframes, options) => { try { return M ? M.animate(el, keyframes, options) : null; } catch { return null; } };
+// Modo ligero (UNO Q, navegador sin GPU): sin animaciones ni efectos costosos. ?lite=1 o --lite en el servidor.
+let LITE = new URLSearchParams(location.search).has('lite');
+const setLite = (on) => { LITE = on; document.body.classList.toggle('lite', on); };
+setLite(LITE);
+const animate = (el, keyframes, options) => { try { return M && !LITE ? M.animate(el, keyframes, options) : null; } catch { return null; } };
 const stagger = (s) => (M && M.stagger ? M.stagger(s) : 0);
 const SPRING = { type: 'spring', stiffness: 420, damping: 20, mass: .8 };
 const FINGER_RANGE = [0, 180];
@@ -145,6 +149,7 @@ function render(s) {
   renderWelcome(s);
   handleEvents(s);
   autoVoice(s);
+  if (s.lite && !LITE) setLite(true);  // el servidor corre en la UNO Q con --lite
   lastVerdict = s.verdict;
 }
 
@@ -372,7 +377,7 @@ function celebrate(a) {
   animate($('flash'), { opacity: [0, 1, 0] }, { duration: .9, ease: 'easeOut', times: [0, .15, 1] });
   const box = $('confetti');
   const colors = ['#4ade80', '#2dd4bf', '#fbbf24', '#a78bfa', '#fb7185', '#fff'];
-  const pieces = Array.from({ length: 36 }, () => {
+  const pieces = Array.from({ length: LITE ? 0 : 36 }, () => {
     const i = document.createElement('i');
     i.style.left = `${Math.random() * 100}%`;
     i.style.background = colors[Math.floor(Math.random() * colors.length)];
