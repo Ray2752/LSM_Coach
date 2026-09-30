@@ -12,11 +12,14 @@ import numpy as np
 
 START_V = 1.6   # empieza el trazo al superar esta velocidad (manos/s) dos veces seguidas
 STOP_V = 1.0    # termina cuando baja de esta velocidad...
-STOP_S = 0.45   # ...durante este tiempo
+STOP_S = 0.6    # ...durante este tiempo (letras). Se evalúa SOLO al terminar: una pausa más
+                # corta que esto no corta el trazo ni saca avisos a mitad
 MIN_S = 0.4     # trazos más cortos se ignoran (un temblor no es una seña)
-MAX_S = 3.5     # tope: se corta y se clasifica lo que haya
+MAX_S = 4.0     # tope: se corta y se clasifica lo que haya (letras)
+WORD_STOP_S = 0.9  # palabras y frases: llevan pausas dentro (GRACIAS, POR FAVOR) y son más largas
+WORD_MAX_S = 5.5
 PRE_S = 0.2     # cuánto se conserva de antes del arranque (la forma inicial de la mano)
-SHOW_S = 2.5    # cuánto tiempo se muestra el resultado
+SHOW_S = 3.0    # cuánto tiempo se muestra el resultado
 COOLDOWN_S = 1.2  # tras un resultado se ignoran trazos nuevos este tiempo: bajar la mano no
                   # debe pisar un "correcto" con "falta el movimiento"
 MIN_PROB = 0.25  # probabilidad mínima para dar el trazo por bueno, además de ser la clase más
@@ -34,8 +37,13 @@ class GestureWindow:
     """Recibe fotograma a fotograma (t, landmarks, ángulos, muñeca) y devuelve el segmento
     del trazo cuando la mano vuelve a quedar quieta."""
 
-    def __init__(self):
+    def __init__(self, stop_s=STOP_S, max_s=MAX_S):
+        self.stop_s, self.max_s = stop_s, max_s
         self.reset()
+
+    def configure(self, word):
+        """Tiempos de una palabra/frase (pausas internas, más largas) o de una letra."""
+        self.stop_s, self.max_s = (WORD_STOP_S, WORD_MAX_S) if word else (STOP_S, MAX_S)
 
     def reset(self):
         self.buf = deque()      # (t, feats, angles, wrist)
@@ -68,7 +76,7 @@ class GestureWindow:
             v = math.hypot(wrist[0] - w0[0], wrist[1] - w0[1]) / size / dt
             self._speed = 0.5 * self._speed + 0.5 * v  # suavizado
         self.buf.append((t, feats, angles, wrist, face, imu))
-        while self.buf and t - self.buf[0][0] > MAX_S + PRE_S + 0.5:
+        while self.buf and t - self.buf[0][0] > self.max_s + PRE_S + 0.5:
             self.buf.popleft()
 
         if not self.active:
@@ -79,11 +87,11 @@ class GestureWindow:
 
         if self._speed < STOP_V:
             self._still_since = self._still_since or t
-            if t - self._still_since >= STOP_S:
+            if t - self._still_since >= self.stop_s:
                 return self._finish(self._still_since)
         else:
             self._still_since = None
-        if t - self.start_t > MAX_S:
+        if t - self.start_t > self.max_s:
             return self._finish(t)
         return None
 

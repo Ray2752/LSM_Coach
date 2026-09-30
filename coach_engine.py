@@ -15,7 +15,7 @@ import cv2
 import mediapipe as mp
 import numpy as np
 
-from dynamic import COOLDOWN_S, MAX_S, MIN_PROB, SHOW_S, STILL, GestureWindow, classify
+from dynamic import COOLDOWN_S, MIN_PROB, SHOW_S, STILL, GestureWindow, classify
 from evaluation import (CONFIG, ERROR_SUFFIX, FINGER_LABEL, SAME_SHAPE, Issue, evaluate,
                         geometry_issues, shape_issue)
 from signs import DYNAMIC, NIVEL_1, WORDS
@@ -299,6 +299,7 @@ class Coach:
         # inclinación del guante por fotograma (palabras): se guarda con la muestra y, si el
         # modelo se entrenó con guante, entra en la clasificación
         tilt = (imu["roll"], imu["pitch"]) if imu and imu.get("roll") is not None else None
+        self.gesture.configure(word=self.target in WORDS)  # palabras: más tiempo y pausas internas
         segment = self.gesture.feed(now, features, angles, (x, w.y, size), face, imu=tilt)
         alert, achievement = self._classify_segment(segment, now)
         self._dyn_state(state, now)
@@ -337,7 +338,7 @@ class Coach:
         if self._record_word:  # grabando una muestra: solo se indica en qué va
             state["recording"] = True
             state["verdict"] = "moving" if self.gesture.active else "ready" if state["hand"] else "nohand"
-            state["hold"] = round(min(1.0, self.gesture.elapsed / MAX_S), 2) if self.gesture.active else 0.0
+            state["hold"] = round(min(1.0, self.gesture.elapsed / self.gesture.max_s), 2) if self.gesture.active else 0.0
             return
         if r and now - r["t"] < SHOW_S:
             state["verdict"] = "ok" if r["ok"] else "fix"
@@ -355,7 +356,7 @@ class Coach:
                 state["failed_parameters"] = [CONFIG]
         elif self.gesture.active:
             state["verdict"] = "moving"
-            state["hold"] = round(min(1.0, self.gesture.elapsed / MAX_S), 2)
+            state["hold"] = round(min(1.0, self.gesture.elapsed / self.gesture.max_s), 2)
         elif state["hand"]:
             state["verdict"] = "ready"
 
