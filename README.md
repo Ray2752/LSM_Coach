@@ -204,8 +204,9 @@ dónde mirar y la MCU (STM32) de la UNO Q mueve los servos suavemente.
 - **Sketch de la MCU:** `uno_q/pan_tilt/sketch.ino`. Se carga desde Arduino App Lab: nueva
   App, pegar el sketch, añadir las librerías **Servo (≥ 1.3.0)** y **Arduino_RouterBridge**,
   Run. Expone `aim(pan, tilt)`, `center()` y `status()` por el Bridge.
-- **Cableado:** señal pan → D9, tilt → D10; +5 V de los servos desde el power bank/elevador
-  (no del pin 5 V de la placa), GND común.
+- **Cableado:** señal pan → D9, tilt → **D11** (en la placa de la demo D10 no daba señal de
+  servo; si un pin no responde, probar D6/D5/D3 y cambiar `PAN_PIN`/`TILT_PIN`); +5 V de los
+  servos desde el power bank/elevador (no del pin 5 V de la placa), GND común.
 - **Linux de la UNO Q:** `pan_tilt.py` habla con el `arduino-router` por su socket Unix
   (`/var/run/arduino-router.sock`, MessagePack-RPC; `pip install msgpack`). Probar los servos:
   `python pan_tilt.py --barrido`. Si la visión corre en la propia UNO Q: `run.sh --seguir`.

@@ -1,7 +1,9 @@
 #include <Arduino_RouterBridge.h>
 #include <Servo.h>
 
-const int PAN_PIN = 9, TILT_PIN = 10;
+// En la UNO Q de la demo (30-sep) D10 no daba señal de servo y D11 sí; D9 está por confirmar.
+// Si el servo de pan no responde en D9, probarlo en D6, D5 o D3 con un sketch de barrido simple.
+const int PAN_PIN = 9, TILT_PIN = 11;
 const int PAN_MIN = 15, PAN_MAX = 165;     // topes mecánicos (ajustar al soporte)
 const int TILT_MIN = 40, TILT_MAX = 140;
 const int PAN_CENTER = 90, TILT_CENTER = 90;
