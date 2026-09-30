@@ -46,6 +46,33 @@ Pon el navegador del monitor en pantalla completa. Teclas: `1`–`5` cambian de 
 
 Opciones: `--cam2 N` agrega una segunda cámara; `--imu none` corre sin muñequera, solo para pruebas.
 
+## Demo en la Arduino UNO Q (todo en la placa, sin laptop)
+
+La UNO Q corre todo: cámara USB, visión, servidor web, Bluetooth con el guante y el
+navegador en la pantalla HDMI. Hardware: hub USB-C con entrada de energía (power bank
+5 V/3 A), monitor HDMI con su propia alimentación, cámara InnoMaker y teclado para
+configurar. La visión va a ~12 fotogramas por segundo en su procesador (suficiente).
+
+1. Primer arranque en modo computadora (hub + pantalla + teclado): crear la contraseña,
+   conectar el Wi-Fi con internet.
+2. En una terminal de la UNO Q:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Ray2752/LSM_Coach/main/uno_q/install.sh | bash
+```
+
+   Instala Python 3.12 (MediaPipe no existe para ARM con el 3.13 que trae la placa),
+   el navegador, Bluetooth, clona el repo, crea el entorno con las versiones de
+   `uno_q/requirements-uno-q.txt`, activa 2 GB de swap y corre las pruebas.
+3. Copiar `.env` (clave de Supabase) a `~/LSM_Coach/.env` si se quiere sincronizar; sin
+   él todo funciona igual, solo local.
+4. Arrancar: `bash ~/LSM_Coach/uno_q/run.sh` (abre el navegador en pantalla completa; al
+   cerrarlo con Alt+F4 se apaga el servidor). `--instalar-autostart` lo deja arrancando
+   solo al encender. `--sin-guante` para probar sin la muñequera.
+
+En Linux `--cam` acepta `/dev/videoN` o `auto` (la cámara USB cambia de número entre
+reinicios; `/dev/video0` y `1` son el códec del procesador, no cámaras).
+
 ## Calibrar con su cámara (muestras correctas y errores)
 
 1. En la interfaz, abre **Calibración**, escribe el nombre de la persona y, con la muñequera

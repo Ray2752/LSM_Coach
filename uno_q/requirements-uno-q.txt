@@ -1,0 +1,16 @@
+# Dependencias para la Arduino UNO Q (Linux ARM64, Python 3.12).
+#
+# MediaPipe solo publica paquetes para ARM64 hasta la 0.10.18 (y solo hasta Python 3.12;
+# la UNO Q trae 3.13, por eso install.sh instala 3.12 aparte). Esa versión aún incluye
+# mp.solutions, que es lo que usa coach_engine.py. Exige numpy<2, así que OpenCV va en
+# la 4.11 (la 4.12+ pide numpy 2).
+mediapipe==0.10.18
+opencv-contrib-python==4.11.0.86
+numpy==1.26.4
+# Mismas versiones que en la Mac: model.joblib se carga tal cual, sin reentrenar.
+scikit-learn==1.9.1
+joblib==1.6.0
+fastapi
+uvicorn[standard]
+bleak
+pillow

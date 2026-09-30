@@ -69,6 +69,7 @@ class Camera:
     REOPEN_AFTER_S = 2.0
 
     def __init__(self, index, width=1280, height=720):
+        # index: número (Mac/Windows), ruta "/dev/videoN" (Linux) o "auto" (la primera que dé imagen)
         self.index, self.width, self.height = index, width, height
         self.cap = self._open()
         if not self.cap.isOpened():
@@ -78,7 +79,21 @@ class Camera:
         threading.Thread(target=self._run, daemon=True).start()
 
     def _open(self):
-        cap = cv2.VideoCapture(self.index)
+        if self.index == "auto":
+            for dev in linux_video_devices():
+                cap = self._open_device(dev)
+                if cap.isOpened() and cap.read()[0]:
+                    print(f"Cámara: {dev}")
+                    return cap
+                cap.release()
+            return cv2.VideoCapture()  # ninguna: queda "sin abrir"
+        return self._open_device(self.index)
+
+    def _open_device(self, dev):
+        # En Linux se abre por V4L2 y en MJPG: en la UNO Q, YUYV solo llega a 30 fps hasta 640x480
+        cap = cv2.VideoCapture(dev, cv2.CAP_V4L2) if sys.platform.startswith("linux") else cv2.VideoCapture(dev)
+        if sys.platform.startswith("linux"):
+            cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
         return cap
@@ -123,7 +138,8 @@ class Runtime:
         self.imu = {"mock": MockIMU, "ble": BLEIMU}.get(args.imu, lambda: None)()
         if self.imu:
             self.imu.start()
-        self.cams = [Camera(args.cam)] + ([Camera(args.cam2)] if args.cam2 is not None else [])
+        w, h = (int(v) for v in args.res.lower().split("x"))
+        self.cams = [Camera(args.cam, w, h)] + ([Camera(args.cam2, w, h)] if args.cam2 is not None else [])
         self.jpeg = [None] * len(self.cams)
         self.person = "invitado"
         self.state = {}
@@ -310,32 +326,56 @@ async def ws_endpoint(ws: WebSocket):
         await ws.close()
 
 
+def linux_video_devices():
+    """Rutas /dev/video* en orden. En la UNO Q, /dev/video0 y 1 son el códec de video del
+    procesador (no dan imagen) y la cámara USB cambia de número entre reinicios: por eso
+    existe --cam auto, que prueba cada una hasta encontrar la que sí da imagen."""
+    import glob
+    return sorted(glob.glob("/dev/video*"), key=lambda p: int(p[len("/dev/video"):] or 0))
+
+
+def cam_arg(value):
+    """--cam acepta un número, una ruta /dev/videoN o 'auto'."""
+    return int(value) if value.isdigit() else value
+
+
 def list_cams(max_index=6):
     """Muestra cada cámara y guarda una foto de cada una para saber cuál es cuál."""
     import tempfile
     out_dir = os.path.join(tempfile.gettempdir(), "lsm_cams")
     os.makedirs(out_dir, exist_ok=True)
-    print("Índice  resolución   foto")
-    for i in range(max_index):
-        cap = cv2.VideoCapture(i)
-        if not cap.isOpened():  # los índices son consecutivos: al primer hueco ya no hay más
-            break
+    linux = sys.platform.startswith("linux")
+    devices = linux_video_devices() if linux else range(max_index)
+    print(("Ruta" if linux else "Índice") + "   resolución   foto")
+    for i in devices:
+        cap = cv2.VideoCapture(i, cv2.CAP_V4L2) if linux else cv2.VideoCapture(i)
+        if not cap.isOpened():
+            if linux:
+                continue
+            break  # en Mac los índices son consecutivos: al primer hueco ya no hay más
+        ok = False
         for _ in range(5):  # las primeras imágenes suelen salir oscuras
             ok, frame = cap.read()
         cap.release()
         if ok:
-            path = os.path.join(out_dir, f"camara_{i}.jpg")
+            name = os.path.basename(str(i)) if linux else f"camara_{i}"
+            path = os.path.join(out_dir, f"{name}.jpg")
             cv2.imwrite(path, frame)
             print(f"  {i}     {frame.shape[1]}x{frame.shape[0]}   {path}")
     if sys.platform == "darwin":
         print(f"\nAbre las fotos con:  open {out_dir}")
+    elif linux:
+        print("\nEn la UNO Q puedes usar --cam auto para no depender del número.")
 
 
 def main():
     global rt, server
     ap = argparse.ArgumentParser(description="Interfaz web de LSM Coach")
-    ap.add_argument("--cam", type=int, default=0, help="cámara principal (evalúa la seña)")
-    ap.add_argument("--cam2", type=int, help="segunda cámara (vista adicional)")
+    ap.add_argument("--cam", type=cam_arg, default=0,
+                    help="cámara principal: número, /dev/videoN o auto (Linux: la primera con imagen)")
+    ap.add_argument("--cam2", type=cam_arg, help="segunda cámara (vista adicional)")
+    ap.add_argument("--res", default="1280x720", metavar="ANCHOxALTO",
+                    help="resolución de captura (640x480 en la UNO Q: menos trabajo para el procesador)")
     ap.add_argument("--sign", default=NIVEL_1[0], choices=ABECEDARIO, help="seña inicial")
     ap.add_argument("--imu", choices=["ble", "none", "mock"], default="ble",
                     help="ble = Nano real (por defecto); mock solo para pruebas, NO en la demo")
