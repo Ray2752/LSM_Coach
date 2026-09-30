@@ -10,6 +10,9 @@ set -euo pipefail
 
 REPO="https://github.com/Ray2752/LSM_Coach.git"
 DIR="$HOME/LSM_Coach"
+# Sin cuadros de diálogo de apt (p. ej. "qué servicios reiniciar"): por adb las flechas no
+# funcionan y el instalador se quedaba esperando. Los servicios se reinician solos.
+export DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a NEEDRESTART_SUSPEND=1
 
 echo "== 1/6 Paquetes del sistema (git, navegador, bluetooth, v4l2, librerías de OpenCV)"
 # Algunas redes (hotspot de celular, campus) bloquean HTTP sin cifrar y apt recibe "403
