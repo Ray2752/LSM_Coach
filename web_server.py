@@ -163,6 +163,11 @@ class Runtime:
                            model=load_model(), dyn_model=load_dynamic_model(),
                            word_model=load_word_model())
         self.coach.notify = self.notify
+        self.tracker = None
+        if args.seguir:  # cámara motorizada (UNO Q + servos): sigue el rostro de la persona
+            from pan_tilt import make_tracker
+            self.tracker = make_tracker()
+            self.coach.track_face = self.tracker is not None
         self.imu = {"mock": MockIMU, "ble": BLEIMU}.get(args.imu, lambda: None)()
         if self.imu:
             self.imu.start()
@@ -216,6 +221,9 @@ class Runtime:
             self.store.add_attempt(person=self.person, **achievement)
             self._event_id += 1
             self.achievement = {"id": self._event_id, **achievement}
+        if self.tracker:
+            self.tracker.update(self.coach._face, time.time(), busy=self.coach.busy,
+                                face_t=self.coach.face_t)
         self.jpeg[0] = encode(frame)
         for i, cam in enumerate(self.cams[1:], start=1):
             other, _ = cam.read()
@@ -440,6 +448,8 @@ def main():
     ap.add_argument("--host", default="127.0.0.1",
                     help="0.0.0.0 para abrir la interfaz desde otro equipo del hotspot")
     ap.add_argument("--port", type=int, default=8000)
+    ap.add_argument("--seguir", action="store_true",
+                    help="cámara motorizada (UNO Q + servos, uno_q/pan_tilt): sigue el rostro de la persona")
     ap.add_argument("--list-cams", action="store_true", help="muestra las cámaras y sale")
     args = ap.parse_args()
     if args.list_cams:

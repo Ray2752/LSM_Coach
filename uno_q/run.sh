@@ -4,6 +4,7 @@
 #
 #   bash ~/LSM_Coach/uno_q/run.sh                       # demo
 #   bash ~/LSM_Coach/uno_q/run.sh --sin-guante          # pruebas sin la muñequera
+#   bash ~/LSM_Coach/uno_q/run.sh --seguir              # con la cámara motorizada (servos)
 #   bash ~/LSM_Coach/uno_q/run.sh --instalar-autostart  # que arranque sola al encender
 set -uo pipefail
 
@@ -23,14 +24,21 @@ EOF
   echo "Listo: LSM Coach arrancará al iniciar sesión. Para quitarlo: rm ~/.config/autostart/lsm-coach.desktop"
   exit 0
 fi
-[ "${1:-}" = "--sin-guante" ] && IMU="none"
+EXTRA=""
+for arg in "$@"; do
+  case "$arg" in
+    --sin-guante) IMU="none" ;;
+    --seguir) EXTRA="$EXTRA --seguir" ;;   # cámara motorizada (servos en D9/D10, uno_q/pan_tilt)
+  esac
+done
 
 cd "$DIR"
 # shellcheck disable=SC1091
 source .venv/bin/activate
 
 # --cam auto: la cámara USB cambia de /dev/videoN entre reinicios. 640x480 alivia al procesador.
-python web_server.py --cam auto --res 640x480 --imu "$IMU" &
+# shellcheck disable=SC2086
+python web_server.py --cam auto --res 640x480 --imu "$IMU" $EXTRA &
 SERVER=$!
 
 # espera a que el servidor responda (máx. 60 s: MediaPipe tarda en cargar la primera vez)

@@ -13,4 +13,5 @@ joblib==1.6.0
 fastapi
 uvicorn[standard]
 bleak
+msgpack  # cámara motorizada: habla con el arduino-router de la UNO Q
 pillow

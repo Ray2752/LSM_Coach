@@ -175,6 +175,24 @@ pecho, espacio neutro) y movimiento. No hay dataset público de LSM con ellas: h
 Las muestras quedan en `samples_words/<PALABRA>/*.npz` con índice en `samples_words/index.csv`.
 Referencias opcionales: `web/ref/words/<PALABRA>.gif` (POR_FAVOR con guion bajo).
 
+## Cámara motorizada (UNO Q + 2 servos SG90)
+
+La cámara va en un soporte pan/tilt y sigue el rostro de la persona. La visión (Linux de la
+UNO Q) decide hacia dónde mirar y la MCU (STM32) mueve los servos suavemente.
+
+- **Sketch de la MCU:** `uno_q/pan_tilt/sketch.ino`. Se carga desde Arduino App Lab: nueva
+  App, pegar el sketch, añadir las librerías **Servo (≥ 1.3.0)** y **Arduino_RouterBridge**,
+  Run. Expone `aim(pan, tilt)`, `center()` y `status()` por el Bridge.
+- **Cableado:** señal pan → D9, tilt → D10; +5 V de los servos desde el power bank/elevador
+  (no del pin 5 V de la placa), GND común.
+- **Linux:** `pan_tilt.py` habla con el `arduino-router` por su socket Unix
+  (`/var/run/arduino-router.sock`, MessagePack-RPC; `pip install msgpack`). Probar los servos:
+  `python pan_tilt.py --barrido`. Arrancar la app con seguimiento: `run.sh --seguir` (o
+  `web_server.py --seguir`).
+- **Comportamiento:** control proporcional con zona muerta y pasos de ≤ 4° a 5 Hz; no se mueve
+  mientras se graba o evalúa un trazo ni si no ve el rostro. Si la cámara "huye" de la persona,
+  cambiar `PAN_SIGN`/`TILT_SIGN` en `pan_tilt.py` (depende del montaje y del espejo).
+
 ## Base de datos en la nube (Supabase)
 
 1. Crea un proyecto en supabase.com y ejecuta `db/supabase_schema.sql` en el *SQL Editor*.

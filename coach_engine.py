@@ -70,6 +70,8 @@ class Coach:
         self._dyn_result = None   # último trazo clasificado: {"t", "best", "prob", "ok"}
         self.face_det = None      # detector de rostro (se crea al elegir una palabra)
         self._face, self._frame_i = None, 0
+        self.face_t = 0.0         # cuándo se vio el rostro por última vez
+        self.track_face = False   # detectar el rostro siempre (cámara motorizada que sigue a la persona)
         self._record_word = None  # {"person"}: la próxima seña se guarda como muestra
         self.notify = None        # callable(texto, kind) que pone el servidor para avisar
         self.proba_hist = deque(maxlen=SMOOTH_FRAMES)
@@ -115,8 +117,8 @@ class Coach:
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         res = self.hands.process(rgb)
         tol = self.tolerances.get(self.target)
-        if self.target in WORDS and (self._bundle() is not None or self._record_word):
-            self._update_face(rgb)  # ubicación de la mano respecto al rostro (Nivel 3)
+        if self.track_face or (self.target in WORDS and (self._bundle() is not None or self._record_word)):
+            self._update_face(rgb, now)  # ubicación respecto al rostro (Nivel 3) y seguimiento de cámara
         state = {"target": self.target, "calibrated": tol is not None, "hand": False,
                  "handedness": None, "fingers": [], "orientation": [], "issues": [],
                  "failed_parameters": [], "verdict": "nohand"}
@@ -225,7 +227,7 @@ class Coach:
             return self.word_model
         return None
 
-    def _update_face(self, rgb):
+    def _update_face(self, rgb, now):
         """Detecta el rostro cada 3 fotogramas (es estable y así no frena la visión)."""
         self._frame_i += 1
         if self._frame_i % 3 != 1:
@@ -237,6 +239,12 @@ class Coach:
         if res.detections:
             b = res.detections[0].location_data.relative_bounding_box
             self._face = (b.xmin + b.width / 2, b.ymin + b.height / 2, b.width, b.height)
+            self.face_t = now
+
+    @property
+    def busy(self):
+        """True mientras se graba o evalúa un trazo: mover la cámara lo alteraría."""
+        return self.gesture.active or self._record_word is not None
 
     def arm_word_record(self, person):
         """La próxima seña completa de la palabra objetivo se guarda como muestra."""
