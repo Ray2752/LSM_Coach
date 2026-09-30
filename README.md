@@ -214,8 +214,7 @@ dónde mirar y la MCU (STM32) de la UNO Q mueve los servos suavemente.
   difusión en el 8766; `--instalar-servicio` lo deja arrancando solo). En la Pi,
   `run.sh --seguir` encuentra la UNO Q sola en la red del hotspot, o `--seguir=IP`.
   Probar desde la Pi: `python pan_tilt.py --red --barrido`.
-- **Comportamiento:** sigue la **mano** (en vertical, el punto medio entre mano y rostro para
-  que los dos queden en la imagen) y, sin mano, el rostro. Control proporcional con zona muerta
+- **Comportamiento:** sigue la **mano** y, sin mano, el rostro. Control proporcional con zona muerta
   y pasos de ≤ 4° a 5 Hz; no se mueve mientras se graba o evalúa un trazo. Si la cámara "huye"
   de la persona, cambiar `PAN_SIGN`/`TILT_SIGN` en `pan_tilt.py` (depende del montaje y del
   espejo). Probar el lazo completo sin la interfaz: `python pan_tilt.py --red --prueba`.

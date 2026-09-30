@@ -233,17 +233,12 @@ HAND_TIMEOUT_S = 1.0  # sin mano más reciente que esto, se sigue el rostro
 
 
 def target_point(hand, hand_t, face, face_t, now):
-    """Qué punto (x, y en 0-1) centrar con la cámara: la **mano** (es lo que se evalúa); en
-    vertical, el punto medio entre mano y rostro para que los dos queden en la imagen (las
-    palabras del Nivel 3 miden la mano respecto al rostro). Sin mano reciente, el rostro,
-    para tener a la persona encuadrada cuando levante la mano. None si no se ve nada."""
-    hand_ok = hand is not None and now - hand_t < HAND_TIMEOUT_S
-    face_ok = face is not None and now - face_t < FACE_TIMEOUT_S
-    if hand_ok and face_ok:
-        return (hand[0], (hand[1] + face[1]) / 2)
-    if hand_ok:
+    """Qué punto (x, y en 0-1) centrar con la cámara: la **mano** (es lo que se evalúa y lo que
+    el usuario pidió seguir). Sin mano reciente, el rostro, para tener a la persona encuadrada
+    cuando levante la mano. None si no se ve nada."""
+    if hand is not None and now - hand_t < HAND_TIMEOUT_S:
         return (hand[0], hand[1])
-    if face_ok:
+    if face is not None and now - face_t < FACE_TIMEOUT_S:
         return (face[0], face[1])
     return None
 
