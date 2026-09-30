@@ -50,11 +50,11 @@ if command -v gsettings >/dev/null 2>&1; then
 fi
 command -v xset >/dev/null 2>&1 && xset s off -dpms 2>/dev/null
 
-# --cam auto: la cámara USB cambia de /dev/videoN entre reinicios. 640x480 alivia al procesador.
+# --cam auto: la cámara USB cambia de /dev/videoN entre reinicios. 480x360 da ~7 fps en la UNO Q (640x480, ~5).
 # --lite: video MJPEG más ligero e interfaz sin efectos (el navegador de la UNO Q no tiene GPU).
 # shellcheck disable=SC2086
 # --modelo-ligero: manos con el modelo ligero de MediaPipe (97 ms vs 162 ms por fotograma en la UNO Q)
-python web_server.py --cam auto --res "${RES:-640x480}" --imu "$IMU" --lite --modelo-ligero $EXTRA &
+python web_server.py --cam auto --res "${RES:-480x360}" --imu "$IMU" --lite --modelo-ligero $EXTRA &
 SERVER=$!
 
 # espera a que el servidor responda (máx. 60 s: MediaPipe tarda en cargar la primera vez)
