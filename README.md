@@ -59,12 +59,13 @@ Opciones: `--cam2 N` agrega una segunda cámara; `--imu none` corre sin muñeque
 ```bash
 python curate.py exp3:Y --aplicar                 # aparta muestras mal etiquetadas (persona:seña)
 python evaluate_public.py --percentiles 1 99 --incluir-propias --guardar   # rangos de los dedos
-python train_classifier.py --publicos --errores --errores-de invitado      # errores de la referencia
+python train_classifier.py --publicos --errores --errores-de invitado exp4 # errores de las referencias
 for s in A B C L Y; do python tolerance_calculator.py analyze --sign $s; done   # orientación (IMU)
 python evaluate_accuracy.py --por-persona         # cifra honesta: deja fuera a cada persona
 ```
 
-Los errores los define una persona de referencia que sabe LSM (`--errores-de`): si cada
+Los errores los definen personas de referencia que saben LSM (`--errores-de`; hoy invitado
+y exp4, que deben grabar los mismos errores típicos del reto): si cada
 quien graba sus propios "errores", se contradicen (lo que uno graba como error otro lo hace
 como correcto) y el modelo aprende cosas opuestas.
 

@@ -13,7 +13,8 @@ from dataclasses import asdict
 import cv2
 import mediapipe as mp
 
-from evaluation import CONFIG, ERROR_SUFFIX, FINGER_LABEL, evaluate, shape_issue
+from evaluation import (CONFIG, ERROR_SUFFIX, FINGER_LABEL, SAME_SHAPE, evaluate, finger_spread,
+                        shape_issue, spread_issue)
 from signs import NIVEL_1
 from tolerance_calculator import (FINGER_JOINTS, landmarks_to_angles, landmarks_to_features,
                                   mirror_features)
@@ -59,6 +60,7 @@ class Coach:
         self.proba_hist = deque(maxlen=SMOOTH_FRAMES)
         self.hands = mp.solutions.hands.Hands(max_num_hands=1, min_detection_confidence=0.6)
         self.history = {f: deque(maxlen=SMOOTH_FRAMES) for f in FINGER_JOINTS}
+        self.spread_hist = deque(maxlen=SMOOTH_FRAMES)  # separación índice-meñique
         self.alerts = AlertPolicy()
         self.progress = {}        # {seña: veces lograda en esta sesión}
         self.last_sample = None   # la última lectura cruda, para guardarla como muestra
@@ -87,6 +89,7 @@ class Coach:
         if not res.multi_hand_landmarks:
             for h in self.history.values():
                 h.clear()
+            self.spread_hist.clear()
             self.proba_hist.clear()
             self.last_sample = None
             self.alerts.update(None, now)
@@ -118,10 +121,17 @@ class Coach:
 
         # FUSIÓN: dedos (cámara) + orientación de la muñeca (IMU)
         result = evaluate(angles, imu, tol, require_imu=self.require_imu)
+        self.spread_hist.append(finger_spread(features))
+        spread = spread_issue(sum(self.spread_hist) / len(self.spread_hist), self.target)
+        if spread:
+            result.issues.append(spread)
         probs = self._shape_probs(self.last_sample["landmarks"])
         if probs:
             letters = {k: v for k, v in probs.items() if not k.endswith(ERROR_SUFFIX)}
-            state["shape"] = {"best": max(letters, key=letters.get),
+            best = max(letters, key=letters.get)
+            if best in SAME_SHAPE.get(self.target, ()):  # misma forma (G = L horizontal)
+                best = self.target
+            state["shape"] = {"best": best,
                               "error": round(probs.get(self.target + ERROR_SUFFIX, 0.0), 2)}
             issue = shape_issue(probs, self.target)
             finger_wrong = any(i.parameter == CONFIG for i in result.issues)

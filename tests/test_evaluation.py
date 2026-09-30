@@ -4,7 +4,7 @@
 """
 import unittest
 
-from evaluation import CONFIG, ORIENT, evaluate
+from evaluation import CONFIG, ORIENT, evaluate, finger_spread, spread_issue
 from tolerance_calculator import _range, mirror_features, one_sided, rotate_upright
 
 TOL = {f: {"min": 160.0, "max": 180.0} for f in ("pulgar", "indice", "medio", "anular", "menique")}
@@ -62,6 +62,30 @@ class RangeTests(unittest.TestCase):
     def test_limites_fisicos(self):
         r = _range([5.0, 175.0], margin=2.0, floor=6.0, lo_limit=0.0, hi_limit=180.0)
         self.assertEqual((r["min"], r["max"]), (0.0, 180.0))
+
+
+def hand_with_pinky_at(degrees):
+    """63 números con el índice (5->8) vertical y el meñique (17->20) abierto `degrees`."""
+    import math
+    f = [0.0] * 63
+    for i, (x, y) in {5: (0, 0), 8: (0, -1), 17: (1, 0),
+                      20: (1 + math.sin(math.radians(degrees)), -math.cos(math.radians(degrees)))}.items():
+        f[3 * i], f[3 * i + 1] = x, y
+    return f
+
+
+class SpreadTests(unittest.TestCase):
+    def test_mide_la_separacion(self):
+        self.assertAlmostEqual(finger_spread(hand_with_pinky_at(0)), 0.0, places=3)
+        self.assertAlmostEqual(finger_spread(hand_with_pinky_at(20)), 20.0, places=3)
+
+    def test_b_con_dedos_separados_pide_juntarlos(self):
+        issue = spread_issue(finger_spread(hand_with_pinky_at(20)), "B")
+        self.assertEqual((issue.parameter, issue.action), (CONFIG, "Junta los dedos"))
+        self.assertIsNone(spread_issue(finger_spread(hand_with_pinky_at(5)), "B"))
+
+    def test_otras_letras_no_exigen_dedos_juntos(self):
+        self.assertIsNone(spread_issue(40.0, "Y"))
 
 
 class MirrorTests(unittest.TestCase):

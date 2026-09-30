@@ -62,6 +62,15 @@ class ShapeIssueTests(unittest.TestCase):
     def test_letra_que_el_modelo_no_conoce(self):
         self.assertIsNone(shape_issue({"A": 1.0}, "J"))
 
+    def test_misma_forma_otra_orientacion_no_rechaza(self):
+        # la G es una L horizontal: la orientación la juzga la muñequera, no la forma
+        self.assertIsNone(shape_issue({"G": 0.6, "L": 0.4}, "L"))
+        self.assertIsNotNone(shape_issue({"D": 0.6, "L": 0.4}, "L"))
+
+    def test_umbral_de_error(self):
+        self.assertIsNotNone(shape_issue({"B": 0.55, "B_mal": 0.45}, "B"))
+        self.assertIsNone(shape_issue({"B": 0.65, "B_mal": 0.35}, "B"))
+
 
 class StoreTests(unittest.TestCase):
     def setUp(self):

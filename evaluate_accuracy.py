@@ -22,7 +22,7 @@ import json
 import os
 import sys
 
-from evaluation import evaluate, shape_issue
+from evaluation import evaluate, finger_spread, shape_issue, spread_issue
 from tolerance_calculator import (DATA_DIR, ERRORS_DIR, FINGER_JOINTS, LANDMARK_COLUMNS,
                                   OUTPUT_FILE)
 
@@ -65,6 +65,8 @@ class Judge:
     def passes(self, row, sign, tol):
         _, angles, imu, feats = row
         if not evaluate(angles, imu, tol, self.require_imu).ok:
+            return False
+        if feats is not None and spread_issue(finger_spread(feats), sign):
             return False
         if self.model is None or feats is None or sign not in map(str, self.model.classes_):
             return True
