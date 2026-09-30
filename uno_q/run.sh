@@ -36,13 +36,17 @@ cd "$DIR"
 # shellcheck disable=SC1091
 source .venv/bin/activate
 
+# Si se lanza por SSH no hay DISPLAY: se usa la pantalla principal del monitor
+export DISPLAY="${DISPLAY:-:0}"
+export XAUTHORITY="${XAUTHORITY:-$HOME/.Xauthority}"
+
 # Que la pantalla no se apague ni bloquee durante la demo ("Power Saving Mode" del monitor)
 if command -v gsettings >/dev/null 2>&1; then
   gsettings set org.gnome.desktop.session idle-delay 0 2>/dev/null
   gsettings set org.gnome.desktop.screensaver lock-enabled false 2>/dev/null
   gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type nothing 2>/dev/null
 fi
-command -v xset >/dev/null 2>&1 && [ -n "${DISPLAY:-}" ] && xset s off -dpms 2>/dev/null
+command -v xset >/dev/null 2>&1 && xset s off -dpms 2>/dev/null
 
 # --cam auto: la cámara USB cambia de /dev/videoN entre reinicios. 640x480 alivia al procesador.
 # shellcheck disable=SC2086
