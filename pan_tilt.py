@@ -48,7 +48,7 @@ UPDATE_S = 0.2      # actualizaciones por segundo (5 Hz)
 FACE_TIMEOUT_S = 1.0  # sin rostro más reciente que esto, no se mueve
 # Signo de cada eje: depende de cómo esté montado el servo y de que la imagen va en espejo.
 # Si la cámara "huye" de la persona en vez de seguirla, cambiar el signo de ese eje.
-PAN_SIGN, TILT_SIGN = -1, 1
+PAN_SIGN, TILT_SIGN = -1, -1  # tilt -1: con el soporte de la demo (30-sep), +1 subía al bajar la mano
 # Ejes en uso. El servo de pan (abajo, D9) dejó de funcionar el 30-sep y la demo va solo con
 # el de tilt (arriba/abajo): el pan se queda centrado. Poner True cuando se reemplace.
 PAN_ENABLED = False
