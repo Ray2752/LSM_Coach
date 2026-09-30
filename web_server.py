@@ -17,11 +17,14 @@ import argparse
 import asyncio
 import json
 import os
+import shutil
+import subprocess
 import sys
 import threading
 import time
 
 import cv2
+import numpy as np
 import uvicorn
 from fastapi import FastAPI, WebSocket
 from fastapi.responses import FileResponse, Response, StreamingResponse
@@ -88,6 +91,44 @@ def load_dynamic_model(path="model_dynamic.joblib"):
     return bundle
 
 
+class RpicamCapture:
+    """Cámara CSI de la Raspberry Pi (p. ej. la AI Camera IMX500). Va por libcamera, así que
+    OpenCV no la abre por V4L2: se lanza `rpicam-vid` y se leen sus fotogramas YUV420 crudos
+    por una tubería (sin comprimir: convertir a BGR cuesta ~1 ms). Misma interfaz que
+    cv2.VideoCapture (isOpened, read, release). El ancho debe ser múltiplo de 64 (640, 1280):
+    es el paso de línea del ISP de la Pi; con otros anchos la imagen saldría desplazada."""
+
+    def __init__(self, width, height, fps=30):
+        self.width, self.height = width, height
+        self.frame_bytes = width * height * 3 // 2
+        cmd = ["rpicam-vid", "-t", "0", "-n", "--codec", "yuv420", "--width", str(width),
+               "--height", str(height), "--framerate", str(fps), "--flush", "-o", "-"]
+        try:
+            self.proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        except OSError:
+            self.proc = None
+
+    def isOpened(self):
+        return self.proc is not None and self.proc.poll() is None
+
+    def read(self):
+        if not self.isOpened():
+            return False, None
+        buf = self.proc.stdout.read(self.frame_bytes)  # bloquea hasta tener el fotograma entero
+        if len(buf) < self.frame_bytes:
+            return False, None
+        yuv = np.frombuffer(buf, np.uint8).reshape(self.height * 3 // 2, self.width)
+        return True, cv2.cvtColor(yuv, cv2.COLOR_YUV2BGR_I420)
+
+    def release(self):
+        if self.proc is not None and self.proc.poll() is None:
+            self.proc.terminate()
+            try:
+                self.proc.wait(2)
+            except subprocess.TimeoutExpired:
+                self.proc.kill()
+
+
 class Camera:
     """Lee una cámara en su propio hilo y guarda el último fotograma (ya en espejo).
     Si deja de mandar imagen (se desconectó o cambió de índice), la vuelve a abrir."""
@@ -107,12 +148,22 @@ class Camera:
         threading.Thread(target=self._run, daemon=True).start()
 
     def _open(self):
+        if self.index == "rpicam":
+            self.device = "rpicam"
+            return RpicamCapture(self.width, self.height)
         if self.index == "auto":
             for dev in linux_video_devices():
                 cap = self._open_device(dev)
                 if cap.isOpened() and cap.read()[0]:
                     print(f"Cámara: {dev}")
                     self.device = dev
+                    return cap
+                cap.release()
+            if shutil.which("rpicam-vid"):  # sin cámara USB: la CSI de la Raspberry Pi (AI Camera)
+                cap = RpicamCapture(self.width, self.height)
+                if cap.isOpened() and cap.read()[0]:
+                    print("Cámara: CSI de la Raspberry Pi (rpicam-vid)")
+                    self.device = "rpicam"
                     return cap
                 cap.release()
             return cv2.VideoCapture()  # ninguna: queda "sin abrir"
@@ -471,14 +522,18 @@ def list_cams(max_index=6):
     if sys.platform == "darwin":
         print(f"\nAbre las fotos con:  open {out_dir}")
     elif linux:
-        print("\nEn la UNO Q puedes usar --cam auto para no depender del número.")
+        if shutil.which("rpicam-hello"):  # Raspberry Pi: cámaras CSI (AI Camera) vía libcamera
+            print("\nCámaras CSI de la Raspberry Pi (--cam rpicam):")
+            subprocess.run(["rpicam-hello", "--list-cameras"], timeout=20)
+        print("\nEn la placa puedes usar --cam auto para no depender del número (USB primero, luego CSI).")
 
 
 def main():
     global rt, server
     ap = argparse.ArgumentParser(description="Interfaz web de LSM Coach")
     ap.add_argument("--cam", type=cam_arg, default=0,
-                    help="cámara principal: número, /dev/videoN o auto (Linux: la primera con imagen)")
+                    help="cámara principal: número, /dev/videoN, rpicam (CSI de la Raspberry Pi) "
+                         "o auto (Linux: la primera USB con imagen, si no la CSI)")
     ap.add_argument("--cam2", type=cam_arg, help="segunda cámara (vista adicional)")
     ap.add_argument("--res", default="1280x720", metavar="ANCHOxALTO",
                     help="resolución de captura (640x480 en la UNO Q: menos trabajo para el procesador)")

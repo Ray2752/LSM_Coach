@@ -32,6 +32,12 @@ sudo apt-get install -y git curl v4l-utils bluez x11-xserver-utils
 # el nombre de libglib cambia entre versiones de Debian (bookworm: libglib2.0-0, trixie: -0t64)
 sudo apt-get install -y libgl1 libglib2.0-0 libportaudio2 || sudo apt-get install -y libgl1 libglib2.0-0t64 libportaudio2
 sudo apt-get install -y chromium || sudo apt-get install -y firefox-esr
+if [ "$PLACA" = "Raspberry Pi" ]; then
+  # Cámaras CSI (rpicam-vid) y el firmware de la AI Camera (IMX500). Si la AI Camera se conecta
+  # por primera vez hace falta reiniciar una vez para que el sistema la detecte.
+  sudo apt-get install -y rpicam-apps || true
+  sudo apt-get install -y imx500-all || echo "(imx500-all no disponible: la AI Camera necesita ese paquete)"
+fi
 sudo usermod -aG video,bluetooth "$USER" || true
 sudo systemctl enable --now bluetooth || true
 
@@ -98,6 +104,9 @@ python -c "import joblib; m = joblib.load('model.joblib'); print('Modelo OK:', l
 echo
 echo "Cámaras conectadas:"
 python web_server.py --list-cams || true
+if [ "$PLACA" = "Raspberry Pi" ] && command -v rpicam-hello >/dev/null 2>&1 && ! rpicam-hello --list-cameras 2>/dev/null | grep -q "^[0-9]"; then
+  echo "No se detectó cámara CSI: si la AI Camera está conectada, reinicia (sudo reboot) y vuelve a correr el instalador."
+fi
 
 echo
 echo "Listo. Para arrancar la demo:   bash ~/LSM_Coach/uno_q/run.sh"

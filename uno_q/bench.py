@@ -27,17 +27,23 @@ def timed(fn, n):
 def open_camera(cam, w, h):
     linux = sys.platform.startswith("linux")
     if linux:
-        from web_server import linux_video_devices, v4l_index
+        import shutil
+        from web_server import RpicamCapture, linux_video_devices, v4l_index
         candidates = linux_video_devices() if cam == "auto" else [cam]
+        if cam == "rpicam" or (cam == "auto" and shutil.which("rpicam-vid")):
+            candidates.append("rpicam")  # cámara CSI de la Raspberry Pi (AI Camera): al final
     else:
         candidates = [cam]
     for dev in candidates:
         dev = int(dev) if isinstance(dev, str) and dev.isdigit() else dev
-        cap = cv2.VideoCapture(v4l_index(dev), cv2.CAP_V4L2) if linux else cv2.VideoCapture(dev)
-        if linux:
-            cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, w)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, h)
+        if dev == "rpicam":
+            cap = RpicamCapture(w, h)
+        else:
+            cap = cv2.VideoCapture(v4l_index(dev), cv2.CAP_V4L2) if linux else cv2.VideoCapture(dev)
+            if linux:
+                cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, w)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, h)
         ok, frame = cap.read()
         if ok:
             print(f"Cámara: {dev}")
