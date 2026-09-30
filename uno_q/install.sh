@@ -20,7 +20,7 @@ echo "== 1/6 Paquetes del sistema (git, navegador, bluetooth, v4l2, librerías d
 sudo sed -i 's|http://deb.debian.org|https://deb.debian.org|g; s|http://security.debian.org|https://security.debian.org|g' \
   /etc/apt/sources.list /etc/apt/sources.list.d/*.sources /etc/apt/sources.list.d/*.list 2>/dev/null || true
 sudo apt-get update
-sudo apt-get install -y git curl v4l-utils bluez libportaudio2 libgl1 libglib2.0-0
+sudo apt-get install -y git curl v4l-utils bluez libportaudio2 libgl1 libglib2.0-0 x11-xserver-utils
 sudo apt-get install -y chromium || sudo apt-get install -y firefox-esr
 sudo usermod -aG video,bluetooth "$USER" || true
 sudo systemctl enable --now bluetooth || true
