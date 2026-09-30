@@ -58,7 +58,8 @@ Opciones: `--cam2 N` agrega una segunda cámara; `--imu none` corre sin muñeque
 
 ```bash
 python curate.py exp3:Y --aplicar                 # aparta muestras mal etiquetadas (persona:seña)
-python evaluate_public.py --percentiles 1 99 --incluir-propias --guardar   # rangos de los dedos
+python evaluate_public.py --percentiles 1 99 --incluir-propias \
+    --expertos invitado exp4 exp5 exp6 exp7 --guardar                      # rangos de los dedos
 python train_classifier.py --publicos --errores --errores-de invitado exp4 # errores de las referencias
 for s in A B C L Y; do python tolerance_calculator.py analyze --sign $s; done   # orientación (IMU)
 python evaluate_accuracy.py --por-persona         # cifra honesta: deja fuera a cada persona

@@ -33,6 +33,8 @@ PERCENTILES = ((5, 95), (3, 97), (2, 98), (1, 99))
 FLOOR = 6.0          # holgura mínima (grados) a cada lado de la mediana
 ERROR_SHIFT = 0.6    # qué tanto se mueve el dedo en el error sintético (0-1 hacia el otro extremo)
 CURVED_SHIFT = 40.0  # para dedos curvados (C): +/- grados
+EXPERT_PCT = (10, 90)  # --expertos: parte de la forma de cada experto que el rango debe cubrir
+EXPERT_MIN = 3         # --expertos: muestras mínimas de esa persona en la seña
 
 
 def load(folder):
@@ -141,6 +143,10 @@ def main():
     ap.add_argument("--incluir-propias", action="store_true",
                     help="al guardar, amplía cada rango para que también acepte las muestras "
                          f"correctas propias ({DATA_DIR}/, percentiles 5-95, sin valores extremos)")
+    ap.add_argument("--expertos", nargs="+", metavar="PERSONA", default=[],
+                    help="al guardar, amplía cada rango para que acepte la forma típica de cada una de "
+                         f"estas personas (percentiles {EXPERT_PCT[0]}-{EXPERT_PCT[1]} de sus correctas, "
+                         f"si tiene >= {EXPERT_MIN} en esa seña)")
     ap.add_argument("--guardar", action="store_true",
                     help=f"guarda en {OUTPUT_FILE} rangos calculados con TODOS los participantes")
     args = ap.parse_args()
@@ -263,11 +269,25 @@ def main():
                     rng[k] = one_sided({"min": round(min(rng[k]["min"], pct(values, 5)), 1),
                                         "max": round(max(rng[k]["max"], pct(values, 95)), 1),
                                         "promedio": rng[k]["promedio"]})
+        # Juntas, las muestras de un experto con pocas grabaciones quedan en las orillas y los
+        # percentiles 5-95 las recortan: la app le decía "Extiende el índice" a una F correcta.
+        # Por eso cada experto amplía el rango con SU forma típica (sin su valor más raro).
+        for sign, rng in full.items():
+            for person in args.expertos:
+                rows = [r for r in own.get(sign, []) if r[0] == person]
+                if len(rows) < EXPERT_MIN:
+                    continue
+                for k in FINGER_JOINTS:
+                    values = [r[2][k] for r in rows]
+                    rng[k] = one_sided({"min": round(min(rng[k]["min"], pct(values, EXPERT_PCT[0])), 1),
+                                        "max": round(max(rng[k]["max"], pct(values, EXPERT_PCT[1])), 1),
+                                        "promedio": rng[k]["promedio"]})
         for sign, rng in full.items():
             old = all_tol.get(sign, {})
             entry = {**rng, "fuente": f"{SOURCE}, grupos {''.join(sorted(groups))}, "
                                       f"{n_people} personas, percentiles {lo}-{hi}"
-                                      + (" + muestras propias" if args.incluir_propias else ""),
+                                      + (" + muestras propias" if args.incluir_propias else "")
+                                      + (f" + expertos: {', '.join(args.expertos)}" if args.expertos else ""),
                      # ancho de la población (abajo, arriba) para centrar el rango en cada usuario
                      "ancho": {k: [round(d, 1), round(u, 1)] for k, (d, u) in full_widths[sign].items()}}
             if old.get("orientacion"):  # la orientación (IMU) se conserva: el dataset no la tiene
