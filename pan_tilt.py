@@ -49,6 +49,9 @@ FACE_TIMEOUT_S = 1.0  # sin rostro más reciente que esto, no se mueve
 # Signo de cada eje: depende de cómo esté montado el servo y de que la imagen va en espejo.
 # Si la cámara "huye" de la persona en vez de seguirla, cambiar el signo de ese eje.
 PAN_SIGN, TILT_SIGN = -1, 1
+# Ejes en uso. El servo de pan (abajo, D9) dejó de funcionar el 30-sep y la demo va solo con
+# el de tilt (arriba/abajo): el pan se queda centrado. Poner True cuando se reemplace.
+PAN_ENABLED = False
 # ---------------------------------------------------------------------------------------
 
 
@@ -250,8 +253,9 @@ class Tracker:
     target_point). `send(pan, tilt)` se llama solo cuando hay que mover; se inyecta para
     poder probarlo sin hardware."""
 
-    def __init__(self, send):
+    def __init__(self, send, pan_enabled=None):
         self.send = send
+        self.pan_enabled = PAN_ENABLED if pan_enabled is None else pan_enabled
         self.pan, self.tilt = float(PAN_CENTER), float(TILT_CENTER)
         self._last_update = 0.0
         self.moves = 0
@@ -264,8 +268,8 @@ class Tracker:
         if face_t is not None and now - face_t > FACE_TIMEOUT_S:
             return False
         self._last_update = now
-        ex, ey = face[0] - 0.5, face[1] - 0.5  # + = rostro a la derecha / abajo de la imagen
-        dpan = 0.0 if abs(ex) < DEADBAND else max(-MAX_STEP, min(MAX_STEP, PAN_SIGN * GAIN * ex))
+        ex, ey = face[0] - 0.5, face[1] - 0.5  # + = punto a la derecha / abajo de la imagen
+        dpan = 0.0 if (abs(ex) < DEADBAND or not self.pan_enabled) else max(-MAX_STEP, min(MAX_STEP, PAN_SIGN * GAIN * ex))
         dtilt = 0.0 if abs(ey) < DEADBAND else max(-MAX_STEP, min(MAX_STEP, TILT_SIGN * GAIN * ey))
         if dpan == 0.0 and dtilt == 0.0:
             return False
@@ -375,7 +379,8 @@ def main():
     if args.apuntar:
         client.notify("aim", *args.apuntar)
     elif args.barrido:
-        for p, t in ((40, 90), (140, 90), (90, 60), (90, 120), (90, 90)):
+        moves = ((40, 90), (140, 90), (90, 60), (90, 120), (90, 90)) if PAN_ENABLED else ((90, 60), (90, 120), (90, 90))
+        for p, t in moves:
             client.notify("aim", p, t)
             time.sleep(1.2)
             print("->", p, t, "estado:", client.call("status"))

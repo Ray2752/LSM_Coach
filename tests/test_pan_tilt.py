@@ -15,7 +15,14 @@ from pan_tilt import DEADBAND, MAX_STEP, PAN_CENTER, PAN_RANGE, PAN_SIGN, TILT_C
 class TrackerTests(unittest.TestCase):
     def setUp(self):
         self.sent = []
-        self.tr = Tracker(lambda p, t: self.sent.append((p, t)))
+        self.tr = Tracker(lambda p, t: self.sent.append((p, t)), pan_enabled=True)
+
+    def test_sin_servo_de_pan_solo_se_mueve_el_tilt(self):
+        tr = Tracker(lambda p, t: self.sent.append((p, t)), pan_enabled=False)
+        self.assertFalse(tr.update((0.9, 0.5, .2, .25), now=10.0))   # rostro a un lado: nada que hacer
+        self.assertTrue(tr.update((0.9, 0.9, .2, .25), now=11.0))    # abajo: solo cambia el tilt
+        self.assertEqual(self.sent[-1][0], PAN_CENTER)
+        self.assertNotEqual(self.sent[-1][1], TILT_CENTER)
 
     def test_rostro_centrado_no_mueve(self):
         self.assertFalse(self.tr.update((0.5, 0.5, .2, .25), now=10.0))
