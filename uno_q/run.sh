@@ -28,15 +28,18 @@ fi
 if [ "${1:-}" = "--instalar-autostart" ]; then
   # ~/.config/autostart lo respetan el escritorio de la UNO Q y Raspberry Pi OS (Wayfire y labwc
   # lo procesan con lxsession-xdg-autostart). Los 5 s dan tiempo a que la cámara y el BT estén.
+  # Las banderas que sigan (p. ej. --seguir) se guardan para cada arranque.
+  shift
+  FLAGS="$*"
   mkdir -p "$HOME/.config/autostart"
   cat > "$HOME/.config/autostart/lsm-coach.desktop" <<EOF
 [Desktop Entry]
 Type=Application
 Name=LSM Coach
-Exec=bash -c "sleep 5; bash $DIR/uno_q/run.sh"
+Exec=bash -c "sleep 5; bash $DIR/uno_q/run.sh $FLAGS"
 X-GNOME-Autostart-Delay=8
 EOF
-  echo "Listo: LSM Coach arrancará al iniciar sesión. Para quitarlo: rm ~/.config/autostart/lsm-coach.desktop"
+  echo "Listo: LSM Coach arrancará al iniciar sesión${FLAGS:+ con: $FLAGS}. Para quitarlo: rm ~/.config/autostart/lsm-coach.desktop"
   exit 0
 fi
 EXTRA=""; WANT=""

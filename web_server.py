@@ -223,9 +223,9 @@ class Runtime:
         self.coach.notify = self.notify
         self.tracker = None
         if args.seguir:  # cámara motorizada (servos en la UNO Q): sigue el rostro de la persona
-            from pan_tilt import make_tracker
-            self.tracker = make_tracker(args.seguir)  # "auto": router local o la UNO Q por red
-            self.coach.track_face = self.tracker is not None
+            # En segundo plano y con reintentos: en la demo las placas arrancan solas y no se
+            # sabe cuál enciende primero; cuando la UNO Q aparezca en la red, empieza a seguir.
+            threading.Thread(target=self._find_tracker, args=(args.seguir,), daemon=True).start()
         self.imu = {"mock": MockIMU, "ble": BLEIMU}.get(args.imu, lambda: None)()
         if self.imu:
             self.imu.start()
@@ -243,6 +243,18 @@ class Runtime:
         self._event_id = 0
         self._lock = threading.Lock()  # protege al Coach (hilo de visión vs. órdenes web)
         threading.Thread(target=self._loop, daemon=True).start()
+
+    TRACKER_RETRY_S = 10
+
+    def _find_tracker(self, remote):
+        from pan_tilt import make_tracker
+        while self.tracker is None:
+            tracker = make_tracker(remote)  # "auto": router local o la UNO Q por red (~5 s)
+            if tracker is not None:
+                self.tracker = tracker
+                self.coach.track_face = True
+                return
+            time.sleep(self.TRACKER_RETRY_S)
 
     def imu_values(self):
         if self.imu is None or not getattr(self.imu, "connected", True):
