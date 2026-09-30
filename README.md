@@ -14,7 +14,7 @@ movimiento (J, K, Ñ, Q, X, Z; Nivel 2) muestran su animación de referencia y a
 
 | Parte | Qué hace | Archivos |
 |---|---|---|
-| Muñequera (Arduino Nano 33 BLE Sense Rev2 + motor de vibración en D3) | Mide roll/pitch con el IMU BMI270 (filtro Madgwick) y los envía por BLE; vibra al recibir una orden | `firmware/lsm_wrist/` |
+| Muñequera (Arduino Nano 33 BLE Sense Rev2 + motor de vibración en D2, vía transistor 2N2222) | Mide roll/pitch con el IMU BMI270 (filtro Madgwick) y los envía por BLE; vibra al recibir una orden | `firmware/lsm_wrist/` |
 | Visión y fusión (laptop) | MediaPipe Hands → ángulos de los 5 dedos; los combina con la orientación de la muñeca | `coach_engine.py`, `evaluation.py` |
 | Interfaz web (monitor de 10.1") | Seña objetivo, veredicto, qué corregir, medidores por dedo y por eje, calibración | `web_server.py`, `web/` |
 | Datos | SQLite local + sincronización con Supabase; CSV por seña para calibrar | `store.py`, `db/`, `samples/` |
