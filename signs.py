@@ -15,6 +15,10 @@ ABECEDARIO = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "
               "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"]
 DYNAMIC = ["J", "K", "Ñ", "Q", "X", "Z"]  # llevan movimiento
 STATIC = [s for s in ABECEDARIO if s not in DYNAMIC]
+# Nivel 3 (opcional): vocabulario funcional. Son señas propias (no deletreo): se evalúan por
+# configuración, ubicación respecto al cuerpo (rostro, pecho, espacio neutro) y movimiento.
+NIVEL_3 = ["HOLA", "GRACIAS", "POR FAVOR", "AYUDA", "MAMÁ"]
+WORDS = NIVEL_3
 
 # "forma": cómo va cada dedo, para mostrarlo al aprendiz (según la descripción del reto)
 SIGNS = {
@@ -53,9 +57,28 @@ for _sign in ABECEDARIO:  # el resto del abecedario: se guía con la imagen de r
     SIGNS.setdefault(_sign, {"descripcion": "Observa la imagen de referencia.",
                              "error_tipico": ""})
 
+# Palabras del reto (Documento oficial, sección 4.4): contexto y parámetros que se evalúan
+SIGNS.update({
+    "HOLA": {"descripcion": "Saludo e inicio de cualquier conversación.",
+             "error_tipico": "Configuración, ubicación o movimiento distintos a la seña.",
+             "parametros": "Configuración, ubicación y movimiento."},
+    "GRACIAS": {"descripcion": "Cortesía básica en la convivencia diaria.",
+                "error_tipico": "No parte del rostro, o falta el movimiento.",
+                "parametros": "Configuración, ubicación respecto al rostro y movimiento."},
+    "POR FAVOR": {"descripcion": "Pedir algo de forma amable.",
+                  "error_tipico": "Mano lejos del cuerpo, o movimiento incompleto.",
+                  "parametros": "Configuración, ubicación respecto al cuerpo y movimiento."},
+    "AYUDA": {"descripcion": "Pedir u ofrecer ayuda; clave en situaciones de emergencia.",
+              "error_tipico": "Orientación de la mano o movimiento incorrectos.",
+              "parametros": "Configuración, orientación y movimiento."},
+    "MAMÁ": {"descripcion": "Vocabulario familiar esencial en el hogar.",
+             "error_tipico": "Mano lejos del rostro.",
+             "parametros": "Configuración y ubicación respecto al rostro."},
+})
+
 
 def level(sign):
-    return 1 if sign in NIVEL_1 else 2 if sign in NIVEL_2 else 0
+    return 1 if sign in NIVEL_1 else 2 if sign in NIVEL_2 else 3 if sign in NIVEL_3 else 0
 
 
 def ref_name(sign, ext):

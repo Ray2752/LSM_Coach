@@ -154,6 +154,27 @@ no se extiende). Si la letra pedida es la más probable con ≥ 0.25, cuenta com
 no, vibra una vez y dice a qué se pareció o que falta el movimiento. Las palabras se
 practican deletreándolas (pestaña **Palabras**), con las letras estáticas.
 
+## Palabras (Nivel 3: HOLA, GRACIAS, POR FAVOR, AYUDA, MAMÁ)
+
+Son señas propias, evaluadas por configuración, **ubicación respecto al cuerpo** (rostro,
+pecho, espacio neutro) y movimiento. No hay dataset público de LSM con ellas: hay que grabarlas.
+
+1. Grabar muestras (15+ por palabra, 2+ personas que sepan la seña), de dos formas:
+   - **En la app:** elegir la palabra (pestaña Palabras), abrir ⚙ Calibración, poner el nombre de
+     la persona y pulsar **Guardar correcta**: la siguiente seña completa (mano quieta al final)
+     se guarda sola, con la posición del rostro.
+   - **De videos** (una ejecución por clip, de frente, con el rostro visible):
+     `python extract_words.py --word HOLA --person ana hola1.mp4 hola2.mp4` o
+     `python extract_words.py --dir videos_palabras` (subcarpetas HOLA/, GRACIAS/, ...); con
+     `--auto` separa varias ejecuciones de un mismo video por el movimiento.
+2. `python train_words.py` → `model_words.joblib` (mide dejando fuera a cada persona).
+3. Reiniciar el servidor (o **Recargar rangos**). Las palabras con modelo se evalúan como las
+   letras con movimiento; las que no tienen muestras se pueden practicar deletreadas
+   (botón **Deletrear** en la tarjeta de la palabra).
+
+Las muestras quedan en `samples_words/<PALABRA>/*.npz` con índice en `samples_words/index.csv`.
+Referencias opcionales: `web/ref/words/<PALABRA>.gif` (POR_FAVOR con guion bajo).
+
 ## Base de datos en la nube (Supabase)
 
 1. Crea un proyecto en supabase.com y ejecuta `db/supabase_schema.sql` en el *SQL Editor*.

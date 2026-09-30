@@ -17,6 +17,8 @@ MIN_S = 0.4     # trazos más cortos se ignoran (un temblor no es una seña)
 MAX_S = 3.5     # tope: se corta y se clasifica lo que haya
 PRE_S = 0.2     # cuánto se conserva de antes del arranque (la forma inicial de la mano)
 SHOW_S = 2.5    # cuánto tiempo se muestra el resultado
+COOLDOWN_S = 1.2  # tras un resultado se ignoran trazos nuevos este tiempo: bajar la mano no
+                  # debe pisar un "correcto" con "falta el movimiento"
 MIN_PROB = 0.25  # probabilidad mínima para dar el trazo por bueno, además de ser la clase más
                  # probable (con 7 clases, incluida "quieta", la masa se reparte: 0.25 ya es claro)
 MIN_PATH = 0.8    # recorrido mínimo de la muñeca (tamaños de mano) para que cuente como trazo:
@@ -48,9 +50,10 @@ class GestureWindow:
     def elapsed(self):
         return (self.buf[-1][0] - self.start_t) if self.active and self.buf else 0.0
 
-    def feed(self, t, feats, angles, wrist):
-        """wrist: (x, y, tamaño) en coordenadas de imagen (0-1). Devuelve el segmento
-        terminado ({feats, angles, wrist, ok, duration}) o None."""
+    def feed(self, t, feats, angles, wrist, face=None):
+        """wrist: (x, y, tamaño) en coordenadas de imagen (0-1). face: (cx, cy, ancho, alto)
+        del rostro en la imagen o None (para las palabras: ubicación respecto al cuerpo).
+        Devuelve el segmento terminado ({feats, angles, wrist, face, ok, duration}) o None."""
         if self._pos is None:
             self._pos = (wrist[0], wrist[1])
         else:
@@ -58,12 +61,12 @@ class GestureWindow:
                          SMOOTH * wrist[1] + (1 - SMOOTH) * self._pos[1])
         wrist = (self._pos[0], self._pos[1], wrist[2])
         if self.buf:
-            t0, _, _, w0 = self.buf[-1]
+            t0, w0 = self.buf[-1][0], self.buf[-1][3]
             dt = max(t - t0, 1e-3)
             size = max(wrist[2], 1e-3)
             v = math.hypot(wrist[0] - w0[0], wrist[1] - w0[1]) / size / dt
             self._speed = 0.5 * self._speed + 0.5 * v  # suavizado
-        self.buf.append((t, feats, angles, wrist))
+        self.buf.append((t, feats, angles, wrist, face))
         while self.buf and t - self.buf[0][0] > MAX_S + PRE_S + 0.5:
             self.buf.popleft()
 
@@ -92,9 +95,11 @@ class GestureWindow:
         self.active, self._fast, self._still_since = False, 0, None
         if len(rows) < 6 or rows[-1][0] - rows[0][0] < MIN_S:
             return None
+        nan4 = (math.nan,) * 4
         return {"feats": np.array([r[1] for r in rows], dtype=np.float32),
                 "angles": np.array([r[2] for r in rows], dtype=np.float32),
                 "wrist": np.array([r[3] for r in rows], dtype=np.float32),
+                "face": np.array([r[4] if r[4] is not None else nan4 for r in rows], dtype=np.float32),
                 "ok": np.ones(len(rows), dtype=np.int8),
                 "duration": round(rows[-1][0] - rows[0][0], 2)}
 
@@ -118,8 +123,13 @@ def classify(bundle, segment):
     (STILL, 1.0) si la mano casi no se movió: la forma sola no es la seña."""
     if wrist_travel(segment) < MIN_PATH or wrist_extent(segment) < MIN_EXTENT:
         return STILL, 1.0
-    from train_dynamic import sequence_features
-    x = sequence_features(segment["feats"], segment["angles"], segment["wrist"], segment["ok"])
+    if bundle.get("kind") == "words":  # señas de palabras: además, ubicación respecto al rostro
+        from train_words import word_features
+        x = word_features(segment["feats"], segment["angles"], segment["wrist"],
+                          segment.get("face"), segment["ok"])
+    else:
+        from train_dynamic import sequence_features
+        x = sequence_features(segment["feats"], segment["angles"], segment["wrist"], segment["ok"])
     probs = bundle["model"].predict_proba([x])[0]
     i = int(np.argmax(probs))
     return str(bundle["model"].classes_[i]), float(probs[i])

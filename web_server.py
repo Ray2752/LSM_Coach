@@ -29,7 +29,7 @@ from fastapi.staticfiles import StaticFiles
 
 from coach_engine import Coach
 from imu_source import BLEIMU, MockIMU
-from signs import ABECEDARIO, DYNAMIC, NIVEL_1, SIGNS, level, ref_name
+from signs import ABECEDARIO, DYNAMIC, NIVEL_1, SIGNS, WORDS, level, ref_name
 from store import Store
 from tolerance_calculator import OUTPUT_FILE, append_sample
 
@@ -60,6 +60,19 @@ def load_model(path="model.joblib"):
     final.n_jobs = 1  # un fotograma a la vez: los hilos en paralelo solo añaden retraso
     print(f"Clasificador cargado: {', '.join(map(str, model.classes_))}")
     return model
+
+
+def load_word_model(path="model_words.joblib"):
+    """Reconocedor de señas de palabras (train_words.py). Sin él, las palabras se practican
+    deletreadas y se pueden grabar muestras desde Calibración."""
+    if not os.path.exists(path):
+        print(f"Aviso: no hay {path}; las palabras del Nivel 3 aún no se evalúan como seña.")
+        return None
+    import joblib
+    bundle = joblib.load(path)
+    bundle["model"].n_jobs = 1
+    print(f"Reconocedor de palabras cargado: {', '.join(bundle['signs'])}")
+    return bundle
 
 
 def load_dynamic_model(path="model_dynamic.joblib"):
@@ -147,7 +160,9 @@ class Runtime:
             self.store.start_sync()
         self.tolerances = load_tolerances()
         self.coach = Coach(self.tolerances, target=args.sign, require_imu=args.imu != "none",
-                           model=load_model(), dyn_model=load_dynamic_model())
+                           model=load_model(), dyn_model=load_dynamic_model(),
+                           word_model=load_word_model())
+        self.coach.notify = self.notify
         self.imu = {"mock": MockIMU, "ble": BLEIMU}.get(args.imu, lambda: None)()
         if self.imu:
             self.imu.start()
@@ -242,11 +257,12 @@ class Runtime:
             self.record(bool(msg.get("is_error")))
         elif kind == "reload":
             self.tolerances = load_tolerances()
-            model, dyn_model = load_model(), load_dynamic_model()
+            model, dyn_model, word_model = load_model(), load_dynamic_model(), load_word_model()
             with self._lock:
                 self.coach.tolerances = self.tolerances
                 self.coach.model = model
                 self.coach.dyn_model = dyn_model
+                self.coach.word_model = word_model
             self.notify(f"Rangos recargados: {', '.join(self.tolerances) or 'ninguno'}")
 
     def record(self, is_error):
@@ -254,6 +270,12 @@ class Runtime:
             sample, sign = self.coach.last_sample, self.coach.target
         if time.time() - self._last_save < MIN_SAVE_GAP_S:
             return self.notify("Muy rápido: cambia un poco la mano y vuelve a guardar", "bad")
+        if sign in WORDS:  # palabra: se graba la próxima seña completa (con rostro y movimiento)
+            if is_error:
+                return self.notify("Las palabras solo se graban correctas", "bad")
+            with self._lock:
+                self.coach.arm_word_record(self.person)
+            return self.notify(f"Haz la seña de {sign} y detén la mano: se guardará al terminar")
         if sign in DYNAMIC:  # una sola imagen no captura el movimiento: dañaría el modelo
             return self.notify(f"La {sign} lleva movimiento: todavía no se puede grabar", "bad")
         if sample is None:
@@ -310,6 +332,14 @@ def api_signs():
             "shape": SIGNS[sign].get("forma", {}),
             "orientation": bool(tol and tol.get("orientacion")),
             "ref": f"/static/ref/{ref_name(sign, 'gif' if dynamic else 'jpg')}",
+        })
+    known = set(rt.coach.word_model["signs"]) if rt.coach.word_model else set()
+    for word in WORDS:  # Nivel 3: señas de palabras (referencia opcional en web/ref/words/)
+        ref = f"words/{word.replace(' ', '_')}.gif"
+        out.append({
+            **SIGNS[word], "sign": word, "level": 3, "dynamic": True, "word": True,
+            "calibrated": word in known, "shape": {}, "orientation": False,
+            "ref": f"/static/ref/{ref}" if os.path.exists(os.path.join(WEB_DIR, "ref", ref)) else None,
         })
     return out
 

@@ -59,8 +59,9 @@ async function loadCatalog() {
   renderPath();
   shownTarget = null;
 }
-const inGroup = (s) => group === 'all' || String(s.level) === group;
+const inGroup = (s) => s.word ? group === 'words' : group === 'all' || String(s.level) === group;
 const level1 = () => catalog.filter((s) => s.level === 1).map((s) => s.sign);
+const isWord = (sign) => !!catalog.find((c) => c.sign === sign)?.word;
 
 function setGroup(g) {
   group = g;
@@ -74,16 +75,17 @@ function renderSignButtons() {
   const box = $('sign-buttons');
   box.classList.toggle('compact', group === 'all');
   const progress = (state && state.progress) || {};
-  if (group === 'words') {
-    box.replaceChildren(...WORDS.map((w) => {
+  if (group === 'words') {  // Nivel 3: la seña propia de cada palabra (o su deletreo, desde la tarjeta)
+    const words = catalog.filter((c) => c.word);
+    box.replaceChildren(...(words.length ? words : WORDS.map((w) => ({ sign: w }))).map((s) => {
       const b = document.createElement('button');
       b.className = 'word';
-      b.textContent = w;
-      b.title = `Deletrear ${w}`;
-      const ok = wordLetters(w).every((l) => catalog.find((c) => c.sign === l)?.calibrated);
-      b.classList.toggle('uncal', !ok);
-      b.setAttribute('aria-pressed', String(practice?.word === w));
-      b.onclick = () => { animate(b, { scale: [1, .94, 1] }, { duration: .25 }); startPractice(wordLetters(w), w); b.blur(); };
+      b.textContent = s.sign;
+      b.title = s.calibrated ? `Seña de ${s.sign}` : `${s.sign}: aún sin muestras de la seña (se puede deletrear)`;
+      b.classList.toggle('uncal', !s.calibrated);
+      b.classList.toggle('done', !!progress[s.sign]);
+      b.setAttribute('aria-pressed', String(s.sign === shownTarget));
+      b.onclick = () => { animate(b, { scale: [1, .94, 1] }, { duration: .25 }); chooseSign(s.sign); b.blur(); };
       return b;
     }));
     return;
@@ -124,7 +126,7 @@ function renderPath() {
 
 function chooseSign(sign) {
   const info = catalog.find((c) => c.sign === sign);
-  if (info && !inGroup(info) && !practice) setGroup('all');
+  if (info && !inGroup(info) && !practice) setGroup(info.word ? 'words' : 'all');
   send({ type: 'target', sign });
 }
 
@@ -151,10 +153,14 @@ function renderTarget(sign) {
   const info = catalog.find((c) => c.sign === sign) || { sign, descripcion: '', error_tipico: '', shape: {}, level: 0 };
   const letter = $('target-letter');
   letter.textContent = sign;
+  letter.classList.toggle('word', !!info.word);
   animate(letter, { scale: [.55, 1], opacity: [0, 1] }, SPRING);  // solo escala: no se mueve de sitio
   $('target-level').textContent = info.level ? `· Nivel ${info.level}` : '';
   $('target-desc').textContent = info.descripcion;
-  $('target-typical').textContent = info.error_tipico ? `Error típico: ${info.error_tipico}` : '';
+  $('target-typical').textContent = info.word && info.parametros ? `Se evalúa: ${info.parametros}`
+    : info.error_tipico ? `Error típico: ${info.error_tipico}` : '';
+  $('target-spell').hidden = !info.word;
+  $('target-spell').onclick = (e) => { startPractice(wordLetters(sign), sign); e.currentTarget.blur(); };
   $('welcome-letter').textContent = sign;
   const ref = $('target-ref');
   ref.hidden = !info.ref;
@@ -185,14 +191,14 @@ function renderVerdict(s) {
     : s.verdict === 'moving' ? (s.hold || 0) : 0;
   $('ring').style.strokeDashoffset = RING * (1 - ring);
   if (s.camera_live === false) setVerdict('bad', 'alert', 'Sin imagen de la cámara');
-  else if (s.verdict === 'ok') setVerdict('ok', 'check', s.motion ? '¡Movimiento correcto!' : s.done ? '¡Seña correcta!' : 'Bien… mantenla');
+  else if (s.verdict === 'ok') setVerdict('ok', 'check', s.motion ? (isWord(s.target) ? '¡Seña correcta!' : '¡Movimiento correcto!') : s.done ? '¡Seña correcta!' : 'Bien… mantenla');
   else if (s.verdict === 'fix') setVerdict('bad', 'x', s.issues[0]?.action || 'Corrige la seña');
   else if (s.verdict === 'settling') setVerdict('wait', 'clock', 'Forma la seña…');
-  else if (s.verdict === 'ready') setVerdict('wait', 'move', `Haz el trazo de la ${s.target}`);
-  else if (s.verdict === 'moving') setVerdict('wait', 'clock', 'Grabando el trazo…');
+  else if (s.verdict === 'ready') setVerdict('wait', 'move', s.recording ? `Grabando: haz la seña de ${s.target}` : isWord(s.target) ? `Haz la seña de ${s.target}` : `Haz el trazo de la ${s.target}`);
+  else if (s.verdict === 'moving') setVerdict('wait', 'clock', s.recording ? 'Grabando la muestra…' : isWord(s.target) ? 'Grabando la seña…' : 'Grabando el trazo…');
   else if (s.verdict === 'uncalibrated') {
-    const dyn = catalog.find((c) => c.sign === s.target)?.dynamic;
-    setVerdict('wait', 'move', dyn ? `La ${s.target} lleva movimiento: mira la referencia` : `La ${s.target} aún no está calibrada`);
+    const info = catalog.find((c) => c.sign === s.target);
+    setVerdict('wait', 'move', info?.word ? `${s.target}: sin muestras de la seña todavía` : info?.dynamic ? `La ${s.target} lleva movimiento: mira la referencia` : `La ${s.target} aún no está calibrada`);
   } else setVerdict('wait', 'hand', 'Muestra tu mano a la cámara');
 }
 
@@ -202,8 +208,8 @@ function renderInstruction(s) {
   let kind = 'wait', text, items = [];
   if (s.camera_live === false) { kind = 'bad'; text = 'Revisa la conexión de la cámara'; }
   else if (s.verdict === 'ok') { kind = 'ok'; text = s.motion ? '¡Perfecto! Puedes repetirlo o elegir otra letra' : s.done ? '¡Perfecto! Baja la mano para otro intento' : 'Muy bien, mantén la seña'; }
-  else if (s.verdict === 'ready') { text = 'Mira la animación, haz el trazo completo y detén la mano'; }
-  else if (s.verdict === 'moving') { text = 'Sigue el trazo… al terminar, deja la mano quieta'; }
+  else if (s.verdict === 'ready') { text = s.recording ? 'Haz la seña completa y detén la mano: se guarda sola' : isWord(s.target) ? 'Haz la seña completa, con el rostro a la vista, y detén la mano' : 'Mira la animación, haz el trazo completo y detén la mano'; }
+  else if (s.verdict === 'moving') { text = isWord(s.target) ? 'Sigue la seña… al terminar, deja la mano quieta' : 'Sigue el trazo… al terminar, deja la mano quieta'; }
   else if (s.verdict === 'fix') {
     kind = 'bad';
     text = s.issues[0]?.action || 'Corrige la seña';
@@ -215,8 +221,9 @@ function renderInstruction(s) {
     });
   } else if (s.verdict === 'settling') { text = 'Acomoda los dedos como en la referencia'; }
   else if (s.verdict === 'uncalibrated') {
-    const dyn = catalog.find((c) => c.sign === s.target)?.dynamic;
-    text = dyn ? 'Practica el movimiento con la animación' : 'Graba muestras de esta seña en Calibración';
+    const info = catalog.find((c) => c.sign === s.target);
+    text = info?.word ? 'Graba la seña en Calibración (⚙ → Guardar correcta) o practícala deletreada'
+      : info?.dynamic ? 'Practica el movimiento con la animación' : 'Graba muestras de esta seña en Calibración';
   } else text = 'Coloca la mano frente a la cámara';
   big.textContent = text;
   big.className = `big ${kind}`;

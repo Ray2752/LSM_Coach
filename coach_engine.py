@@ -13,11 +13,12 @@ from dataclasses import asdict
 
 import cv2
 import mediapipe as mp
+import numpy as np
 
-from dynamic import MAX_S, MIN_PROB, SHOW_S, STILL, GestureWindow, classify
+from dynamic import COOLDOWN_S, MAX_S, MIN_PROB, SHOW_S, STILL, GestureWindow, classify
 from evaluation import (CONFIG, ERROR_SUFFIX, FINGER_LABEL, SAME_SHAPE, Issue, evaluate,
                         geometry_issues, shape_issue)
-from signs import DYNAMIC, NIVEL_1
+from signs import DYNAMIC, NIVEL_1, WORDS
 from tolerance_calculator import (FINGER_JOINTS, landmarks_to_angles, landmarks_to_features,
                                   mirror_features)
 
@@ -58,13 +59,19 @@ class AlertPolicy:
 
 
 class Coach:
-    def __init__(self, tolerances, target=NIVEL_1[0], require_imu=True, model=None, dyn_model=None):
+    def __init__(self, tolerances, target=NIVEL_1[0], require_imu=True, model=None, dyn_model=None,
+                 word_model=None):
         self.tolerances = tolerances
         self.require_imu = require_imu
         self.model = model        # clasificador de landmarks (opcional)
         self.dyn_model = dyn_model  # clasificador de trazos para J, K, Ñ, Q, X, Z (opcional)
+        self.word_model = word_model  # señas de palabras del Nivel 3 (opcional)
         self.gesture = GestureWindow()
         self._dyn_result = None   # último trazo clasificado: {"t", "best", "prob", "ok"}
+        self.face_det = None      # detector de rostro (se crea al elegir una palabra)
+        self._face, self._frame_i = None, 0
+        self._record_word = None  # {"person"}: la próxima seña se guarda como muestra
+        self.notify = None        # callable(texto, kind) que pone el servidor para avisar
         self.proba_hist = deque(maxlen=SMOOTH_FRAMES)
         self.hands = mp.solutions.hands.Hands(max_num_hands=1, min_detection_confidence=0.6)
         self.history = {f: deque(maxlen=SMOOTH_FRAMES) for f in FINGER_JOINTS}
@@ -105,8 +112,11 @@ class Coach:
         """frame: BGR ya en espejo (se dibuja la mano encima). imu: {"roll","pitch","yaw"}
         o None si no hay lectura. Devuelve (estado, vibrar, logro o None)."""
         now = time.time()
-        res = self.hands.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        res = self.hands.process(rgb)
         tol = self.tolerances.get(self.target)
+        if self.target in WORDS and (self._bundle() is not None or self._record_word):
+            self._update_face(rgb)  # ubicación de la mano respecto al rostro (Nivel 3)
         state = {"target": self.target, "calibrated": tol is not None, "hand": False,
                  "handedness": None, "fingers": [], "orientation": [], "issues": [],
                  "failed_parameters": [], "verdict": "nohand"}
@@ -120,7 +130,7 @@ class Coach:
             self._was_hand = False
             self._cand = self._stable = None
             alert, achievement = False, None
-            if self.target in DYNAMIC and self.dyn_model is not None:
+            if self._bundle() is not None or self._record_word:
                 if self.gesture.active:  # la mano salió de cuadro: ahí terminó el trazo
                     alert, achievement = self._classify_segment(self.gesture.finish(now), now)
                 self._dyn_state(state, now)  # el resultado se sigue mostrando aunque baje la mano
@@ -150,7 +160,7 @@ class Coach:
         self.last_sample = {"angles": raw, "landmarks": features,
                             "imu": dict(imu) if imu else None}
 
-        if self.target in DYNAMIC and self.dyn_model is not None:
+        if self._bundle() is not None or self._record_word:  # letra con movimiento o palabra
             return self._process_dynamic(state, now, features, raw, lm, state["handedness"])
 
         if tol is None:
@@ -207,24 +217,87 @@ class Coach:
         state["done"] = self._counted
         return state, alert, achievement
 
+    def _bundle(self):
+        """Modelo de secuencias que aplica a la seña objetivo, o None si no hay."""
+        if self.target in DYNAMIC:
+            return self.dyn_model
+        if self.target in WORDS and self.word_model and self.target in self.word_model["signs"]:
+            return self.word_model
+        return None
+
+    def _update_face(self, rgb):
+        """Detecta el rostro cada 3 fotogramas (es estable y así no frena la visión)."""
+        self._frame_i += 1
+        if self._frame_i % 3 != 1:
+            return
+        if self.face_det is None:
+            self.face_det = mp.solutions.face_detection.FaceDetection(model_selection=0,
+                                                                      min_detection_confidence=0.5)
+        res = self.face_det.process(rgb)
+        if res.detections:
+            b = res.detections[0].location_data.relative_bounding_box
+            self._face = (b.xmin + b.width / 2, b.ymin + b.height / 2, b.width, b.height)
+
+    def arm_word_record(self, person):
+        """La próxima seña completa de la palabra objetivo se guarda como muestra."""
+        self._record_word = {"person": person}
+        self.gesture.reset()
+
+    def _save_word_sample(self, segment):
+        """Guarda el trazo en samples_words/<PALABRA>/ (formato de extract_words.py)."""
+        import csv
+        import glob
+        import os
+        from train_words import DATA_DIR
+        word, person = self.target, self._record_word["person"]
+        os.makedirs(os.path.join(DATA_DIR, word), exist_ok=True)
+        n = len(glob.glob(os.path.join(DATA_DIR, word, "*.npz")))
+        name = f"{person}-live-{n:03d}"
+        np.savez_compressed(os.path.join(DATA_DIR, word, f"{name}.npz"), feats=segment["feats"],
+                            angles=segment["angles"], wrist=segment["wrist"], face=segment["face"],
+                            ok=segment["ok"])
+        index = os.path.join(DATA_DIR, "index.csv")
+        new = not os.path.exists(index)
+        with open(index, "a", newline="", encoding="utf-8") as f:
+            w = csv.DictWriter(f, fieldnames=["file", "word", "person", "source", "frames", "detected", "face_frames"])
+            if new:
+                w.writeheader()
+            w.writerow({"file": name, "word": word, "person": person, "source": "live",
+                        "frames": len(segment["ok"]), "detected": int(segment["ok"].sum()),
+                        "face_frames": int(np.isfinite(segment["face"][:, 2]).sum())})
+        return n + 1
+
     def _process_dynamic(self, state, now, features, raw, lm, handedness):
-        """Letras con movimiento: acumula el trazo de la muñeca y lo clasifica cuando la mano
-        se detiene. Veredictos: ready (esperando el trazo), moving (grabando), ok / fix."""
-        state["calibrated"] = True
+        """Letras con movimiento y palabras: acumula el trazo de la muñeca y lo clasifica (o lo
+        guarda como muestra) cuando la mano se detiene. Veredictos: ready, moving, ok / fix."""
+        state["calibrated"] = self._bundle() is not None
         w, m = lm.landmark[0], lm.landmark[9]
         size = math.hypot(m.x - w.x, m.y - w.y)
         x = 1.0 - w.x if handedness == "Left" else w.x  # mano izquierda: reflejada, como los landmarks
         angles = [raw[f] for f in ("pulgar", "indice", "medio", "anular", "menique")]
-        segment = self.gesture.feed(now, features, angles, (x, w.y, size))
+        face = self._face if self.target in WORDS else None
+        segment = self.gesture.feed(now, features, angles, (x, w.y, size), face)
         alert, achievement = self._classify_segment(segment, now)
         self._dyn_state(state, now)
         return state, alert, achievement
 
     def _classify_segment(self, segment, now):
-        """Clasifica un trazo terminado. Devuelve (vibrar, logro)."""
+        """Clasifica un trazo terminado (o lo guarda, si se pidió grabar). Devuelve (vibrar, logro)."""
         if segment is None:
             return False, None
-        best, prob = classify(self.dyn_model, segment)
+        if self._record_word:
+            n = self._save_word_sample(segment)
+            self._record_word = None
+            if self.notify:
+                self.notify(f"Seña de {self.target} guardada ({n} en total, {segment['duration']} s)")
+            self._dyn_result = None
+            return False, None
+        bundle = self._bundle()
+        if bundle is None:
+            return False, None
+        if self._dyn_result and now - self._dyn_result["t"] < COOLDOWN_S:
+            return False, None  # el movimiento de "recoger" la mano no es un intento nuevo
+        best, prob = classify(bundle, segment)
         ok = best == self.target and prob >= MIN_PROB
         self._dyn_result = {"t": now, "best": best, "prob": prob, "ok": ok}
         if ok:
@@ -236,15 +309,23 @@ class Coach:
         """Veredicto de una letra con movimiento: el último resultado (SHOW_S), o si está
         grabando el trazo, o esperando a que empiece."""
         r = self._dyn_result
+        if self._record_word:  # grabando una muestra: solo se indica en qué va
+            state["recording"] = True
+            state["verdict"] = "moving" if self.gesture.active else "ready" if state["hand"] else "nohand"
+            state["hold"] = round(min(1.0, self.gesture.elapsed / MAX_S), 2) if self.gesture.active else 0.0
+            return
         if r and now - r["t"] < SHOW_S:
             state["verdict"] = "ok" if r["ok"] else "fix"
             state["done"] = r["ok"]
             state["hold"] = 1.0 if r["ok"] else 0.0
             state["motion"] = {"best": r["best"], "prob": round(r["prob"], 2)}
             if not r["ok"]:
-                action = (f"Falta el movimiento: haz el trazo completo de la {self.target}" if r["best"] == STILL
-                          else f"El trazo se parece a la {r['best']}" if r["best"] != self.target
-                          else f"Repite el trazo de la {self.target} más claro")
+                word = self.target in WORDS
+                name = lambda s: s if s in WORDS else f"la {s}"
+                action = ((f"Falta el movimiento: haz la seña completa de {self.target}" if word
+                           else f"Falta el movimiento: haz el trazo completo de la {self.target}") if r["best"] == STILL
+                          else f"{'La seña' if word else 'El trazo'} se parece a {name(r['best'])}" if r["best"] != self.target
+                          else f"Repite {'la seña de ' + self.target if word else 'el trazo de la ' + self.target} más claro")
                 state["issues"] = [asdict(Issue(CONFIG, "movimiento", action))]
                 state["failed_parameters"] = [CONFIG]
         elif self.gesture.active:
